@@ -13,6 +13,9 @@ let gameStartTime = Date.now();
 let lastHumanSpawnTime = 0;
 let humanSpawnInterval = 10000; // 10 seconds
 
+// Import dialogue data
+import { humanCollisionDialogue, objectHitDialogue } from './dialogue.js';
+
 // Game objects
 const player = {
     x: canvas.width / 2,
@@ -180,6 +183,9 @@ function spawnHuman() {
         visionColor: 'rgba(255, 0, 0, 0.3)',
         changeDirectionTime: 0,
         directionChangeInterval: 3000, // Change direction every 3 seconds
+        lastSpeechTime: 0, // For speech bubble cooldown
+        speechText: null, // Current speech text
+        speechEndTime: 0, // When to remove speech bubble
     };
     
     humans.push(human);
@@ -206,11 +212,34 @@ function updatePlayer() {
     const newX = player.x + dx;
     const newY = player.y + dy;
     
-    if (newX - player.radius > 0 && newX + player.radius < canvas.width) {
+    let canMoveX = true;
+    let canMoveY = true;
+    
+    // Check for collisions with room objects
+    if (dx !== 0 || dy !== 0) {
+        roomObjects.forEach(obj => {
+            if (circleRectangleCollision(
+                newX, player.y, player.radius,
+                obj.x, obj.y, obj.width, obj.height
+            )) {
+                canMoveX = false;
+            }
+            
+            if (circleRectangleCollision(
+                player.x, newY, player.radius,
+                obj.x, obj.y, obj.width, obj.height
+            )) {
+                canMoveY = false;
+            }
+        });
+    }
+    
+    // Apply movement if allowed and within canvas bounds
+    if (canMoveX && newX - player.radius > 0 && newX + player.radius < canvas.width) {
         player.x = newX;
     }
     
-    if (newY - player.radius > 0 && newY + player.radius < canvas.height) {
+    if (canMoveY && newY - player.radius > 0 && newY + player.radius < canvas.height) {
         player.y = newY;
     }
     
@@ -257,8 +286,14 @@ function updatePlayer() {
 }
 
 function updateObjects() {
+    const currentTime = Date.now();
+    
     roomObjects.forEach(obj => {
         if (obj.vx !== undefined && obj.vy !== undefined) {
+            // Store previous position
+            const previousX = obj.x;
+            const previousY = obj.y;
+            
             // Update position
             obj.x += obj.vx;
             obj.y += obj.vy;
@@ -287,8 +322,42 @@ function updateObjects() {
                 obj.y = canvas.height - obj.height;
                 obj.vy = -obj.vy * 0.5;
             }
+            
+            // Check for collision with humans if the object is moving
+            if (Math.abs(obj.vx) > 0.5 || Math.abs(obj.vy) > 0.5) {
+                humans.forEach(human => {
+                    if (circleRectangleCollision(
+                        human.x, human.y, human.radius,
+                        obj.x, obj.y, obj.width, obj.height
+                    )) {
+                        // Make the object bounce off the human
+                        obj.vx = -obj.vx * 0.8;
+                        obj.vy = -obj.vy * 0.8;
+                        
+                        // Make human show speech bubble if enough time has passed
+                        if (currentTime - human.lastSpeechTime > 5000) {
+                            human.speechText = getRandomDialogue(objectHitDialogue);
+                            human.lastSpeechTime = currentTime;
+                            human.speechEndTime = currentTime + 3000; // Show for 3 seconds
+                        }
+                    }
+                });
+            }
         }
     });
+}
+
+function circleRectangleCollision(circleX, circleY, circleRadius, rectX, rectY, rectWidth, rectHeight) {
+    // Find closest point on rectangle to circle
+    const closestX = Math.max(rectX, Math.min(circleX, rectX + rectWidth));
+    const closestY = Math.max(rectY, Math.min(circleY, rectY + rectHeight));
+    
+    // Calculate distance between closest point and circle center
+    const distanceX = circleX - closestX;
+    const distanceY = circleY - closestY;
+    const distanceSquared = distanceX * distanceX + distanceY * distanceY;
+    
+    return distanceSquared < (circleRadius * circleRadius);
 }
 
 function updateHumans() {
@@ -301,15 +370,103 @@ function updateHumans() {
     }
     
     humans.forEach(human => {
+        // Store previous position
+        const previousX = human.x;
+        const previousY = human.y;
+        
         // Random direction change
         if (currentTime - human.changeDirectionTime > human.directionChangeInterval) {
             human.direction += (Math.random() - 0.5) * Math.PI / 2; // Change by up to 45 degrees
             human.changeDirectionTime = currentTime;
         }
         
-        // Move human
-        human.x += Math.cos(human.direction) * human.speed;
-        human.y += Math.sin(human.direction) * human.speed;
+        // Calculate new position
+        const newX = human.x + Math.cos(human.direction) * human.speed;
+        const newY = human.y + Math.sin(human.direction) * human.speed;
+        
+        let canMoveX = true;
+        let canMoveY = true;
+        let isStuck = false;
+        
+        // Check for collisions with room objects
+        roomObjects.forEach(obj => {
+            if (circleRectangleCollision(
+                newX, human.y, human.radius,
+                obj.x, obj.y, obj.width, obj.height
+            )) {
+                canMoveX = false;
+            }
+            
+            if (circleRectangleCollision(
+                human.x, newY, human.radius,
+                obj.x, obj.y, obj.width, obj.height
+            )) {
+                canMoveY = false;
+            }
+            
+            // Check if human is stuck inside an object
+            if (circleRectangleCollision(
+                human.x, human.y, human.radius,
+                obj.x, obj.y, obj.width, obj.height
+            )) {
+                isStuck = true;
+            }
+        });
+        
+        // Check for collisions with other humans
+        humans.forEach(otherHuman => {
+            if (human === otherHuman) return;
+            
+            // Check horizontal collision
+            const xDistance = newX - otherHuman.x;
+            const yDistance = human.y - otherHuman.y;
+            const totalDistance = Math.sqrt(xDistance * xDistance + yDistance * yDistance);
+            
+            if (totalDistance < human.radius + otherHuman.radius) {
+                canMoveX = false;
+                
+                // Make humans talk to each other
+                if (currentTime - human.lastSpeechTime > 5000 && currentTime - otherHuman.lastSpeechTime > 5000) {
+                    human.speechText = getRandomDialogue(humanCollisionDialogue);
+                    human.lastSpeechTime = currentTime;
+                    human.speechEndTime = currentTime + 3000; // Show for 3 seconds
+                }
+            }
+            
+            // Check vertical collision
+            const xDist = human.x - otherHuman.x;
+            const yDist = newY - otherHuman.y;
+            const totalDist = Math.sqrt(xDist * xDist + yDist * yDist);
+            
+            if (totalDist < human.radius + otherHuman.radius) {
+                canMoveY = false;
+            }
+        });
+        
+        // If human is stuck, teleport them to a random door
+        if (isStuck) {
+            const doorIndex = Math.floor(Math.random() * doors.length);
+            const door = doors[doorIndex];
+            human.x = door.x;
+            human.y = door.y;
+            // Face away from player
+            human.direction = Math.atan2(player.y - human.y, player.x - human.x) + Math.PI;
+        } else {
+            // Apply movement if allowed
+            if (canMoveX) {
+                human.x = newX;
+            } else {
+                // Bounce off obstacle
+                human.direction = Math.PI - human.direction;
+            }
+            
+            if (canMoveY) {
+                human.y = newY;
+            } else {
+                // Bounce off obstacle
+                human.direction = -human.direction;
+            }
+        }
         
         // Bounce off walls
         if (human.x - human.radius < 0) {
@@ -333,6 +490,12 @@ function updateHumans() {
             endGame();
         }
     });
+}
+
+// Helper function to get random dialogue
+function getRandomDialogue(dialogueArray) {
+    const randomIndex = Math.floor(Math.random() * dialogueArray.length);
+    return dialogueArray[randomIndex];
 }
 
 function isPlayerInVision(human) {
@@ -537,6 +700,8 @@ function drawPlayer() {
 }
 
 function drawHumans() {
+    const currentTime = Date.now();
+    
     humans.forEach(human => {
         // Draw vision cone first (so it's behind the human)
         drawVisionCone(human);
@@ -556,7 +721,82 @@ function drawHumans() {
             human.radius * 0.6, 0, Math.PI * 2
         );
         ctx.fill();
+        
+        // Draw speech bubble if active
+        if (human.speechText && currentTime < human.speechEndTime) {
+            drawSpeechBubble(human, human.speechText);
+        }
     });
+}
+
+function drawSpeechBubble(human, text) {
+    ctx.save();
+    
+    const bubbleWidth = 120;
+    const bubbleHeight = 40;
+    const bubblePadding = 10;
+    const arrowSize = 10;
+    
+    // Position bubble above human
+    const bubbleX = human.x - bubbleWidth / 2;
+    const bubbleY = human.y - human.radius - bubbleHeight - arrowSize - 5;
+    
+    // Draw bubble background
+    ctx.fillStyle = 'white';
+    ctx.strokeStyle = 'black';
+    ctx.lineWidth = 1;
+    
+    // Bubble rectangle
+    ctx.beginPath();
+    ctx.roundRect(bubbleX, bubbleY, bubbleWidth, bubbleHeight, 8);
+    ctx.fill();
+    ctx.stroke();
+    
+    // Bubble arrow
+    ctx.beginPath();
+    ctx.moveTo(human.x, human.y - human.radius - 5);
+    ctx.lineTo(human.x - arrowSize, bubbleY + bubbleHeight);
+    ctx.lineTo(human.x + arrowSize, bubbleY + bubbleHeight);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    
+    // Draw text
+    ctx.fillStyle = 'black';
+    ctx.font = '12px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    
+    // Wrap text to fit bubble
+    const words = text.split(' ');
+    let line = '';
+    let lines = [];
+    const maxWidth = bubbleWidth - 2 * bubblePadding;
+    
+    for (let i = 0; i < words.length; i++) {
+        const testLine = line + words[i] + ' ';
+        const metrics = ctx.measureText(testLine);
+        const testWidth = metrics.width;
+        
+        if (testWidth > maxWidth && i > 0) {
+            lines.push(line);
+            line = words[i] + ' ';
+        } else {
+            line = testLine;
+        }
+    }
+    lines.push(line);
+    
+    // Calculate vertical position for centering
+    const lineHeight = 14;
+    let textY = bubbleY + bubblePadding + (bubbleHeight - lines.length * lineHeight) / 2;
+    
+    // Draw each line
+    for (let i = 0; i < lines.length; i++) {
+        ctx.fillText(lines[i], human.x, textY + i * lineHeight);
+    }
+    
+    ctx.restore();
 }
 
 function drawRoomObjects() {
@@ -605,4 +845,3 @@ humans[0].direction = Math.atan2(player.y - humans[0].y, player.x - humans[0].x)
 
 // Start the game
 resetGame();
-
