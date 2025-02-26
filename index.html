@@ -1,0 +1,28 @@
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Elephant in the Room</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div id="game-container">
+        <canvas id="gameCanvas"></canvas>
+        <div id="game-over" class="hidden">
+            <h2>Game Over!</h2>
+            <p>You were spotted by a human.</p>
+            <p>Your score: <span id="final-score">0</span></p>
+            <button id="restart-btn">Play Again</button>
+        </div>
+        <div id="hud">
+            <div id="score">Score: 0</div>
+            <div id="controls-info">
+                <p>WASD or Arrow Keys to move</p>
+                <p>Mouse Click to swing trunk</p>
+            </div>
+        </div>
+    </div>
+    <script src="game.js"></script>
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js/v8c78df7c7c0f484497ecbca7046644da1771523124516" integrity="sha512-8DS7rgIrAmghBFwoOTujcf6D9rXvH8xm8JQ1Ja01h9QX8EzXldiszufYa4IFfKdLUKTTrnSFXLDkUEOTrZQ8Qg==" data-cf-beacon='{"version":"2024.11.0","token":"4c6229722a6346bc8eb5cb0e5eae5d41","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
+</body>
+</html>
