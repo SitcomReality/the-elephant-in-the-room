@@ -89,3 +89,52 @@ export function renderSpeechBubble(ctx, x, y, radius, text) {
         ctx.fillText(line, bubbleX + bubblePadding, bubbleY + bubblePadding + index * lineHeight);
     });
 }
+
+export function renderScoreMultiplier(ctx, multiplier, maxMultiplier, x, y, recentlyIncreased) {
+    // If no multiplier, nothing to render
+    if (multiplier <= 0) return;
+    
+    // Calculate color based on multiplier value
+    const alpha = multiplier / maxMultiplier;
+    const baseColor = recentlyIncreased ? "#FFCC00" : "#FFFFFF"; // Gold when increased, white otherwise
+    
+    // Set default font
+    const fontSize = Math.min(24 + (multiplier * 2), 40); // Grow font with multiplier, max at 40px
+    ctx.font = `bold ${fontSize}px Arial`;
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+    
+    // Create gradient 
+    const textGradient = ctx.createLinearGradient(x, y, x, y + fontSize);
+    textGradient.addColorStop(0, baseColor);
+    textGradient.addColorStop(1, `rgba(150, 150, 150, ${alpha})`);
+    
+    // Text shadow for emphasis
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
+    ctx.shadowBlur = 4;
+    ctx.shadowOffsetX = 2;
+    ctx.shadowOffsetY = 2;
+    
+    // Scale effect for recently increased multipliers
+    let scale = 1;
+    if (recentlyIncreased) {
+        scale = 1.2; // Bulge effect
+    }
+    
+    // Apply scale transformation
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(scale, scale);
+    
+    // Draw text with gradient
+    ctx.fillStyle = textGradient;
+    const text = `×${multiplier.toFixed(1)}`;
+    ctx.fillText(text, 0, 0);
+    
+    // Restore context
+    ctx.restore();
+    ctx.shadowColor = 'transparent';
+    ctx.shadowBlur = 0;
+    ctx.shadowOffsetX = 0;
+    ctx.shadowOffsetY = 0;
+}

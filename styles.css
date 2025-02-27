@@ -44,6 +44,9 @@ body {
     margin-bottom: 10px;
     font-weight: bold;
     color: #ffcc00;
+    display: flex;
+    align-items: center;
+    gap: 10px;
 }
 
 #controls-info {

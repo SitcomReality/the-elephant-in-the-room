@@ -3,7 +3,7 @@ import { humanCollisionDialogue, objectHitDialogue } from './dialogue.js';
 import { Player } from './player.js';
 import { RoomObject } from './objects.js';
 import { Human } from './human.js';
-import { renderSpeechBubble } from './ui.js';
+import { renderSpeechBubble, renderScoreMultiplier } from './ui.js';
 import { circleRectangleCollision, lineIntersectsRect } from './physics.js';
 
 // Game canvas and context
@@ -20,6 +20,16 @@ let score = 0;
 let gameStartTime = Date.now();
 let lastHumanSpawnTime = 0;
 let humanSpawnInterval = 10000; // 10 seconds
+
+// Score multiplier system
+let scoreMultiplier = 0;
+let maxMultiplier = 5.0; // Cap the multiplier at 5x
+let multiplierIncreaseAmount = 0.1;
+let lastMultiplierIncreaseTime = 0;
+let multiplierDecayDelay = 3000; // Start decaying after 3 seconds of no increase
+let baseDecayRate = 0.01; // Base decay rate per second
+let multiplierRecentlyIncreased = false;
+let recentlyIncreasedReset = 0;
 
 // Input state
 export const keys = {
@@ -140,6 +150,8 @@ function resetGame() {
     score = 0;
     gameStartTime = Date.now();
     lastHumanSpawnTime = 0;
+    scoreMultiplier = 0;
+    lastMultiplierIncreaseTime = 0;
     
     // Reset player position
     player.reset(canvas.width / 2, canvas.height / 2);
@@ -194,12 +206,52 @@ function updateObjects() {
                     // Make human show speech bubble if enough time has passed
                     if (currentTime - human.lastSpeechTime > 5000) {
                         human.speak(getRandomDialogue(objectHitDialogue), currentTime);
+                        
+                        // Increase score multiplier if object was moving fast enough
+                        const objSpeed = Math.sqrt(obj.vx * obj.vx + obj.vy * obj.vy);
+                        if (objSpeed > 1.0 && currentTime - human.lastHitTime > 1000) {
+                            increaseMultiplier(currentTime);
+                            human.lastHitTime = currentTime; // Prevent multiple increases from same hit
+                        }
                     }
                 }
             });
         }
     });
 }
+
+function increaseMultiplier(currentTime) {
+    // Increase multiplier
+    scoreMultiplier = Math.min(scoreMultiplier + multiplierIncreaseAmount, maxMultiplier);
+    lastMultiplierIncreaseTime = currentTime;
+    
+    // Flag for animation
+    multiplierRecentlyIncreased = true;
+    recentlyIncreasedReset = currentTime + 500; // Animation lasts 500ms
+}
+
+function updateMultiplier(currentTime) {
+    // Reset the "recently increased" flag if needed
+    if (multiplierRecentlyIncreased && currentTime > recentlyIncreasedReset) {
+        multiplierRecentlyIncreased = false;
+    }
+    
+    // Only decay if enough time has passed since last increase
+    if (currentTime - lastMultiplierIncreaseTime > multiplierDecayDelay && scoreMultiplier > 0) {
+        // Calculate decay rate - higher multiplier decays faster
+        const decayFactor = 1 + (scoreMultiplier / maxMultiplier) * 4; // 1x to 5x faster decay
+        const actualDecayRate = baseDecayRate * decayFactor;
+        
+        // Calculate time-based decay amount
+        const deltaTime = (currentTime - Math.max(lastMultiplierIncreaseTime + multiplierDecayDelay, 
+                            lastUpdateTime)) / 1000; // Convert to seconds
+        
+        // Apply decay
+        scoreMultiplier = Math.max(0, scoreMultiplier - (actualDecayRate * deltaTime));
+    }
+}
+
+let lastUpdateTime = Date.now();
 
 function updateHumans() {
     const currentTime = Date.now();
@@ -268,9 +320,19 @@ function isLineOfSightBlocked(x1, y1, x2, y2) {
     return false;
 }
 
-function updateScore() {
-    score = Math.floor((Date.now() - gameStartTime) / 1000);
+function updateScore(currentTime) {
+    // Calculate base score from time
+    const baseScore = Math.floor((currentTime - gameStartTime) / 1000);
+    
+    // Apply multiplier
+    const multiplierBonus = scoreMultiplier * baseScore;
+    score = Math.floor(baseScore + multiplierBonus);
+    
+    // Update display
     document.getElementById('score').textContent = `Score: ${score}`;
+    
+    // Update last update time
+    lastUpdateTime = currentTime;
 }
 
 function endGame() {
@@ -293,18 +355,26 @@ function render() {
     
     // Draw player
     player.render(ctx);
+    
+    // Render multiplier
+    if (scoreMultiplier > 0) {
+        renderScoreMultiplier(ctx, scoreMultiplier, maxMultiplier, 120, 10, multiplierRecentlyIncreased);
+    }
 }
 
 function gameLoop() {
     // Clear canvas
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     
+    const currentTime = Date.now();
+    
     if (!gameOver) {
         // Update game objects
         updatePlayer();
         updateObjects();
         updateHumans();
-        updateScore();
+        updateMultiplier(currentTime);
+        updateScore(currentTime);
         
         // Render everything
         render();

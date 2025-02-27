@@ -23,6 +23,7 @@ export class Human {
         this.speechText = null; // Current speech text
         this.speechEndTime = 0; // When to remove speech bubble
         this.collisionImmunityEndTime = Date.now() + 5000; // 5 seconds of collision immunity
+        this.lastHitTime = 0; // Track last time this human was hit by object
     }
     
     speak(text, currentTime) {
