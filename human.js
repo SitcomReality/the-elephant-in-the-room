@@ -1,4 +1,4 @@
-import { circleRectangleCollision } from './physics.js';
+import { circleRectangleCollision, calculateVisionRay } from './physics.js';
 
 export class Human {
     constructor(x, y, direction) {
@@ -238,6 +238,42 @@ export class Human {
         this.visionGrowthStartTime = currentTime;
     }
     
+    drawVisionCone(ctx) {
+        ctx.save();
+        
+        // Define the vision cone path
+        ctx.beginPath();
+        ctx.moveTo(this.x, this.y);
+        
+        const leftAngle = this.direction - this.fovAngle / 2;
+        const rightAngle = this.direction + this.fovAngle / 2;
+        
+        // Draw vision triangle with line-of-sight consideration
+        const rayCount = 20; // Number of rays to cast
+        
+        // Get roomObjects from game state
+        const { roomObjects } = window.gameState || { roomObjects: [] };
+        
+        for (let i = 0; i <= rayCount; i++) {
+            const rayAngle = leftAngle + (rightAngle - leftAngle) * (i / rayCount);
+            const rayLength = this.visionDistance; // Use current vision distance
+            
+            // Cast a ray in this direction and find the closest intersection
+            const intersection = calculateVisionRay(this.x, this.y, rayAngle, rayLength, roomObjects);
+            
+            // Add the visible endpoint to our vision cone
+            ctx.lineTo(intersection.x, intersection.y);
+        }
+        
+        ctx.closePath();
+        
+        // Fill with semi-transparent color
+        ctx.fillStyle = this.visionColor;
+        ctx.fill();
+        
+        ctx.restore();
+    }
+    
     render(ctx, renderSpeechBubble) {
         // Draw vision cone
         this.drawVisionCone(ctx);
@@ -263,41 +299,5 @@ export class Human {
         if (this.speechText && currentTime < this.speechEndTime) {
             renderSpeechBubble(ctx, this.x, this.y, this.radius, this.speechText);
         }
-    }
-    
-    drawVisionCone(ctx) {
-        ctx.save();
-        
-        // Define the vision cone path
-        ctx.beginPath();
-        ctx.moveTo(this.x, this.y);
-        
-        const leftAngle = this.direction - this.fovAngle / 2;
-        const rightAngle = this.direction + this.fovAngle / 2;
-        
-        // Draw vision triangle with line-of-sight consideration
-        const rayCount = 20; // Number of rays to cast
-        
-        // Get roomObjects from game state (imported at the top)
-        const { roomObjects } = window.gameState || { roomObjects: [] };
-        
-        for (let i = 0; i <= rayCount; i++) {
-            const rayAngle = leftAngle + (rightAngle - leftAngle) * (i / rayCount);
-            const rayLength = this.visionDistance; // Use current vision distance
-            
-            // Cast a ray in this direction and find the closest intersection
-            const intersection = calculateVisionRay(this.x, this.y, rayAngle, rayLength, roomObjects);
-            
-            // Add the visible endpoint to our vision cone
-            ctx.lineTo(intersection.x, intersection.y);
-        }
-        
-        ctx.closePath();
-        
-        // Fill with semi-transparent color
-        ctx.fillStyle = this.visionColor;
-        ctx.fill();
-        
-        ctx.restore();
     }
 }
