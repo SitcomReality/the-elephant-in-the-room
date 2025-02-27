@@ -425,6 +425,9 @@ function isLineOfSightBlocked(x1, y1, x2, y2) {
 }
 
 function updateScore(currentTime) {
+    // Only update score if game is not paused
+    if (isLevelingUp) return;
+    
     // Calculate base score from time
     const baseScore = Math.floor((currentTime - gameStartTime) / 1000);
     
@@ -936,3 +939,10 @@ function endGame() {
     document.getElementById('final-score').textContent = score;
     document.getElementById('game-over').classList.remove('hidden');
 }
+
+// Handle window resize
+window.addEventListener('resize', () => {
+    // Update canvas dimensions to match container
+    canvas.width = canvas.parentElement.clientWidth;
+    canvas.height = canvas.parentElement.clientHeight;
+});

@@ -45,6 +45,9 @@ export class Player {
         this.swingDecay = 0.9; // How quickly the swing force decays
         this.currentSwingForce = 0;
         
+        // Add property for yeeting objects on click
+        this.yeetStrength = 10;
+        
         // Initialize trunk nodes
         this.initTrunk();
     }
@@ -146,6 +149,11 @@ export class Player {
         
         // Calculate angle between player and mouse
         this.trunkAngle = Math.atan2(mouse.y - this.y, mouse.x - this.x);
+        
+        // Check if player is clicking to yeet objects directly touching the elephant
+        if (mouse.down) {
+            this.yeetObjectsInContact(roomObjects, mouse);
+        }
         
         // Update trunk nodes
         this.updateTrunk(mouse, roomObjects);
@@ -250,6 +258,32 @@ export class Player {
         
         // Always check for collisions between all trunk nodes and room objects
         this.checkTrunkCollisions(roomObjects);
+    }
+    
+    yeetObjectsInContact(roomObjects, mouse) {
+        // Find objects that are in contact with the elephant
+        roomObjects.forEach(obj => {
+            if (circleRectangleCollision(
+                this.x, this.y, this.radius,
+                obj.x, obj.y, obj.width, obj.height
+            )) {
+                // Calculate direction from elephant to mouse
+                const dx = mouse.x - this.x;
+                const dy = mouse.y - this.y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                
+                if (dist > 0) {
+                    // Normalize and apply force
+                    const dirX = dx / dist;
+                    const dirY = dy / dist;
+                    
+                    // Apply force based on object mass
+                    const forceFactor = this.yeetStrength / (obj.mass || 1);
+                    obj.vx += dirX * forceFactor;
+                    obj.vy += dirY * forceFactor;
+                }
+            }
+        });
     }
     
     checkTrunkCollisions(roomObjects) {
