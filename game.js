@@ -43,7 +43,9 @@ let selectedUpgrades = [];
 let lastPickupSpawnTime = 0;
 let pickupSpawnInterval = 10000; // 10 seconds
 let pickupLifetime = 3000; // 3 seconds
-let activePickup = null;
+let activePickups = []; // Changed from single pickup to array
+let secondaryPickupTimer = 0;
+let secondaryPickupInterval = 0; // Will be randomized between 8-12 seconds
 
 // Input state
 export const keys = {
@@ -227,8 +229,12 @@ function resetGame() {
     // Add initial human
     spawnHuman();
     
-    // Clear any active pickup
-    activePickup = null;
+    // Clear any active pickups
+    activePickups = [];
+    
+    // Initialize secondary pickup timer
+    secondaryPickupInterval = 8000 + Math.floor(Math.random() * 4000);
+    secondaryPickupTimer = Date.now() + secondaryPickupInterval;
     
     // Update UI
     updateLevelProgressUI();
@@ -251,8 +257,9 @@ function spawnHuman() {
 function updatePlayer() {
     player.update(keys, mouse, canvas.width, canvas.height, roomObjects);
     
-    // Check for collision with active pickup
-    if (activePickup) {
+    // Check for collision with active pickups
+    for (let i = activePickups.length - 1; i >= 0; i--) {
+        const pickup = activePickups[i];
         const playerRect = {
             x: player.x - player.radius,
             y: player.y - player.radius,
@@ -261,14 +268,15 @@ function updatePlayer() {
         };
         
         const pickupRect = {
-            x: activePickup.x,
-            y: activePickup.y,
+            x: pickup.x,
+            y: pickup.y,
             width: 40,
             height: 40
         };
         
         if (rectsIntersect(playerRect, pickupRect)) {
-            collectPickup();
+            collectPickup(pickup);
+            activePickups.splice(i, 1);
         }
     }
 }
@@ -583,21 +591,47 @@ function teleportAllHumans() {
 function updatePickups() {
     const currentTime = Date.now();
     
-    // Check if we need to spawn a new pickup
-    if (!activePickup && currentTime - lastPickupSpawnTime > pickupSpawnInterval) {
+    // Check if we need to spawn a new pickup from primary timer
+    if (currentTime - lastPickupSpawnTime > pickupSpawnInterval) {
         spawnPickup();
         lastPickupSpawnTime = currentTime;
     }
     
-    // Check if pickup has expired
-    if (activePickup && currentTime - activePickup.spawnTime > pickupLifetime) {
-        removePickup();
+    // Check if we need to spawn a new pickup from secondary timer
+    if (currentTime > secondaryPickupTimer) {
+        spawnPickup();
+        // Set next secondary pickup timer (random between 8-12 seconds)
+        secondaryPickupInterval = 8000 + Math.floor(Math.random() * 4000);
+        secondaryPickupTimer = currentTime + secondaryPickupInterval;
     }
+    
+    // Check if pickups have expired
+    activePickups = activePickups.filter(pickup => {
+        const hasExpired = currentTime - pickup.spawnTime > pickupLifetime;
+        if (hasExpired) {
+            // If pickup is temporary effect and active, handle its expiration
+            if (pickup.isActive && pickup.type === 'blind') {
+                endBlindEffect();
+            } else if (pickup.isActive && pickup.type === 'rocket') {
+                endSpeedBoostEffect();
+            }
+        }
+        return !hasExpired;
+    });
 }
 
 function spawnPickup() {
-    // Determine pickup type (50/50 chance)
-    const isScorePickup = Math.random() > 0.5;
+    // Pickup types with equal probability
+    const pickupTypes = [
+        'score', // +10% score
+        'reset', // Teleport all humans
+        'points', // +50 points
+        'multiplier', // +1.0x multiplier
+        'rocket', // Speed boost
+        'blind' // Reduce human vision
+    ];
+    
+    const pickupType = pickupTypes[Math.floor(Math.random() * pickupTypes.length)];
     
     // Find a position away from the player and not inside objects
     let x, y;
@@ -627,64 +661,174 @@ function spawnPickup() {
             }
         }
         
+        // Check collision with other pickups
+        for (const pickup of activePickups) {
+            if (rectsIntersect(
+                { x, y, width: 40, height: 40 },
+                { x: pickup.x, y: pickup.y, width: 40, height: 40 }
+            )) {
+                collides = true;
+                break;
+            }
+        }
+        
         validPosition = !collides;
     }
     
     // Create the pickup
-    activePickup = {
-        type: isScorePickup ? 'score' : 'reset',
+    const pickup = {
+        type: pickupType,
         x,
         y,
-        spawnTime: Date.now()
+        spawnTime: Date.now(),
+        isActive: false, // For tracking temporary effects
+        duration: 5000 // Duration for temporary effects (5 seconds)
     };
+    
+    activePickups.push(pickup);
 }
 
-function collectPickup() {
-    if (!activePickup) return;
-    
-    // Apply pickup effect
-    if (activePickup.type === 'score') {
-        // Increase score by 10%
-        score += Math.floor(score * 0.1);
-        checkLevelProgression();
-    } else if (activePickup.type === 'reset') {
-        // Teleport all humans to random doors
-        teleportAllHumans();
+function collectPickup(pickup) {
+    // Apply pickup effect based on type
+    switch (pickup.type) {
+        case 'score':
+            // Increase score by 10%
+            score += Math.floor(score * 0.1);
+            break;
+        case 'reset':
+            // Teleport all humans to random doors
+            teleportAllHumans();
+            break;
+        case 'points':
+            // Add 50 points directly
+            score += 50;
+            break;
+        case 'multiplier':
+            // Add 1.0 to current multiplier
+            scoreMultiplier = Math.min(scoreMultiplier + 1.0, maxMultiplier);
+            lastMultiplierIncreaseTime = Date.now();
+            multiplierRecentlyIncreased = true;
+            recentlyIncreasedReset = Date.now() + 500;
+            break;
+        case 'rocket':
+            // Temporary speed boost
+            applySpeedBoostEffect(pickup);
+            break;
+        case 'blind':
+            // Temporary vision reduction for humans
+            applyBlindEffect(pickup);
+            break;
     }
     
-    // Remove the pickup
-    removePickup();
+    // Check for level up after score changes
+    checkLevelProgression();
 }
 
-function removePickup() {
-    // Reset pickup cooldown
-    lastPickupSpawnTime = Date.now();
-    activePickup = null;
-}
-
-function endGame() {
-    gameOver = true;
-    document.getElementById('final-score').textContent = score;
-    document.getElementById('game-over').classList.remove('hidden');
-}
-
-function renderPickup() {
-    if (!activePickup) return;
+// New effect functions
+function applySpeedBoostEffect(pickup) {
+    // Store original speed before boost
+    if (!player.originalSpeed) {
+        player.originalSpeed = player.speed;
+    }
+    // Apply speed boost
+    player.speed = player.originalSpeed * 1.75;
     
-    // Determine class based on pickup type
-    const className = activePickup.type === 'score' ? 'pickup-score' : 'pickup-reset';
-    const text = activePickup.type === 'score' ? '+10%' : 'Reset';
+    // Mark pickup as active and schedule end of effect
+    pickup.isActive = true;
+    pickup.endTime = Date.now() + pickup.duration;
+    
+    // Schedule effect end
+    setTimeout(() => {
+        endSpeedBoostEffect();
+    }, pickup.duration);
+}
+
+function endSpeedBoostEffect() {
+    if (player.originalSpeed) {
+        player.speed = player.originalSpeed;
+        player.originalSpeed = null;
+    }
+}
+
+function applyBlindEffect(pickup) {
+    // Store original vision distance for all humans
+    humans.forEach(human => {
+        if (!human.originalMaxVisionDistance) {
+            human.originalMaxVisionDistance = human.maxVisionDistance;
+        }
+        human.maxVisionDistance = human.originalMaxVisionDistance / 2;
+        human.visionDistance = Math.min(human.visionDistance, human.maxVisionDistance);
+    });
+    
+    // Mark pickup as active and schedule end of effect
+    pickup.isActive = true;
+    pickup.endTime = Date.now() + pickup.duration;
+    
+    // Schedule effect end
+    setTimeout(() => {
+        endBlindEffect();
+    }, pickup.duration);
+}
+
+function endBlindEffect() {
+    humans.forEach(human => {
+        if (human.originalMaxVisionDistance) {
+            // Reset the vision growth process
+            human.maxVisionDistance = human.originalMaxVisionDistance;
+            human.visionGrowthStartTime = Date.now();
+            human.visionDistance = Math.min(human.visionDistance, human.maxVisionDistance / 2);
+            human.originalMaxVisionDistance = null;
+        }
+    });
+}
+
+function renderPickup(pickup) {
+    // Determine style based on pickup type
+    let color, text, glowColor;
+    
+    switch (pickup.type) {
+        case 'score':
+            color = '#0066ff';
+            text = '+10%';
+            glowColor = '#0099ff';
+            break;
+        case 'reset':
+            color = '#ff3300';
+            text = 'Reset';
+            glowColor = '#ff6600';
+            break;
+        case 'points':
+            color = '#00cc66';
+            text = '+50';
+            glowColor = '#00ff80';
+            break;
+        case 'multiplier':
+            color = '#ffcc00';
+            text = '+1.0x';
+            glowColor = '#ffdd44';
+            break;
+        case 'rocket':
+            color = '#ff00cc';
+            text = '';
+            glowColor = '#ff66dd';
+            break;
+        case 'blind':
+            color = '#9900cc';
+            text = '';
+            glowColor = '#cc66ff';
+            break;
+    }
     
     // Draw pickup
-    ctx.fillStyle = activePickup.type === 'score' ? '#0066ff' : '#ff3300';
-    ctx.fillRect(activePickup.x, activePickup.y, 40, 40);
+    ctx.fillStyle = color;
+    ctx.fillRect(pickup.x, pickup.y, 40, 40);
     
     // Add glow effect
-    ctx.shadowColor = activePickup.type === 'score' ? '#0099ff' : '#ff6600';
+    ctx.shadowColor = glowColor;
     ctx.shadowBlur = 10;
     ctx.strokeStyle = '#ffffff';
     ctx.lineWidth = 2;
-    ctx.strokeRect(activePickup.x, activePickup.y, 40, 40);
+    ctx.strokeRect(pickup.x, pickup.y, 40, 40);
     ctx.shadowBlur = 0;
     
     // Draw text
@@ -692,7 +836,7 @@ function renderPickup() {
     ctx.font = 'bold 14px Arial';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText(text, activePickup.x + 20, activePickup.y + 20);
+    ctx.fillText(text, pickup.x + 20, pickup.y + 20);
 }
 
 function render() {
@@ -702,10 +846,10 @@ function render() {
     // Draw game objects
     roomObjects.forEach(obj => obj.render(ctx));
     
-    // Draw active pickup
-    if (activePickup) {
-        renderPickup();
-    }
+    // Draw active pickups
+    activePickups.forEach(pickup => {
+        renderPickup(pickup);
+    });
     
     // Draw humans
     humans.forEach(human => {
@@ -785,3 +929,10 @@ window.gameState = {
     ctx,
     roomObjects
 };
+
+// End game function
+function endGame() {
+    gameOver = true;
+    document.getElementById('final-score').textContent = score;
+    document.getElementById('game-over').classList.remove('hidden');
+}

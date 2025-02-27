@@ -14,6 +14,7 @@ export class Human {
         this.fovAngle = Math.PI / 3; // 60 degrees field of view
         this.visionDistance = 0; // Start with no vision
         this.maxVisionDistance = 200; // Maximum vision distance
+        this.originalMaxVisionDistance = null; // For storing original vision when affected by pickups
         this.visionGrowthStartTime = Date.now(); // When vision started growing
         this.visionGrowthDuration = 2000; // Vision grows over 2 seconds
         this.visionColor = 'rgba(255, 0, 0, 0.3)';
@@ -35,7 +36,7 @@ export class Human {
     }
     
     update(currentTime, player, roomObjects, humans, canvasWidth, canvasHeight, doors) {
-        // Update vision distance for newly spawned humans
+        // Update vision distance for newly spawned humans or when returning from blinded state
         if (this.visionDistance < this.maxVisionDistance) {
             const elapsed = currentTime - this.visionGrowthStartTime;
             const progress = Math.min(elapsed / this.visionGrowthDuration, 1);

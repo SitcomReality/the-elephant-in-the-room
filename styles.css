@@ -223,6 +223,30 @@ body {
     box-shadow: 0 0 10px #ff6600;
 }
 
+.pickup-points {
+    background-color: #00cc66;
+    color: white;
+    box-shadow: 0 0 10px #00ff80;
+}
+
+.pickup-multiplier {
+    background-color: #ffcc00;
+    color: white;
+    box-shadow: 0 0 10px #ffdd44;
+}
+
+.pickup-rocket {
+    background-color: #ff00cc;
+    color: white;
+    box-shadow: 0 0 10px #ff66dd;
+}
+
+.pickup-blind {
+    background-color: #9900cc;
+    color: white;
+    box-shadow: 0 0 10px #cc66ff;
+}
+
 /* Progress bar for level */
 #level-progress-container {
     position: absolute;
@@ -250,4 +274,38 @@ body {
     font-size: 14px;
     color: #ffcc00;
     z-index: 10;
+}
+
+#speed-boost-indicator {
+    position: absolute;
+    top: 60px;
+    left: 10px;
+    background-color: #ff00cc;
+    color: white;
+    padding: 5px 10px;
+    border-radius: 5px;
+    font-size: 14px;
+    opacity: 0;
+    transition: opacity 0.3s;
+}
+
+#speed-boost-indicator.active {
+    opacity: 1;
+}
+
+#vision-reduction-indicator {
+    position: absolute;
+    top: 90px;
+    left: 10px;
+    background-color: #9900cc;
+    color: white;
+    padding: 5px 10px;
+    border-radius: 5px;
+    font-size: 14px;
+    opacity: 0;
+    transition: opacity 0.3s;
+}
+
+#vision-reduction-indicator.active {
+    opacity: 1;
 }
