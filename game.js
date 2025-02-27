@@ -193,6 +193,7 @@ function spawnHuman() {
         lastSpeechTime: 0, // For speech bubble cooldown
         speechText: null, // Current speech text
         speechEndTime: 0, // When to remove speech bubble
+        collisionImmunityEndTime: Date.now() + 5000, // 5 seconds of collision immunity
     };
     
     humans.push(human);
@@ -447,35 +448,40 @@ function updateHumans() {
             }
         });
         
-        // Check for collisions with other humans
-        humans.forEach(otherHuman => {
-            if (human === otherHuman) return;
-            
-            // Check horizontal collision
-            const xDistance = newX - otherHuman.x;
-            const yDistance = human.y - otherHuman.y;
-            const totalDistance = Math.sqrt(xDistance * xDistance + yDistance * yDistance);
-            
-            if (totalDistance < human.radius + otherHuman.radius) {
-                canMoveX = false;
+        // Check for collisions with other humans (if not immune)
+        if (currentTime > human.collisionImmunityEndTime) {
+            humans.forEach(otherHuman => {
+                if (human === otherHuman) return;
                 
-                // Make humans talk to each other
-                if (currentTime - human.lastSpeechTime > 5000 && currentTime - otherHuman.lastSpeechTime > 5000) {
-                    human.speechText = getRandomDialogue(humanCollisionDialogue);
-                    human.lastSpeechTime = currentTime;
-                    human.speechEndTime = currentTime + 3000; // Show for 3 seconds
+                // Skip collision check if the other human is immune
+                if (currentTime <= otherHuman.collisionImmunityEndTime) return;
+                
+                // Check horizontal collision
+                const xDistance = newX - otherHuman.x;
+                const yDistance = human.y - otherHuman.y;
+                const totalDistance = Math.sqrt(xDistance * xDistance + yDistance * yDistance);
+                
+                if (totalDistance < human.radius + otherHuman.radius) {
+                    canMoveX = false;
+                    
+                    // Make humans talk to each other
+                    if (currentTime - human.lastSpeechTime > 5000 && currentTime - otherHuman.lastSpeechTime > 5000) {
+                        human.speechText = getRandomDialogue(humanCollisionDialogue);
+                        human.lastSpeechTime = currentTime;
+                        human.speechEndTime = currentTime + 3000; // Show for 3 seconds
+                    }
                 }
-            }
-            
-            // Check vertical collision
-            const xDist = human.x - otherHuman.x;
-            const yDist = newY - otherHuman.y;
-            const totalDist = Math.sqrt(xDist * xDist + yDist * yDist);
-            
-            if (totalDist < human.radius + otherHuman.radius) {
-                canMoveY = false;
-            }
-        });
+                
+                // Check vertical collision
+                const xDist = human.x - otherHuman.x;
+                const yDist = newY - otherHuman.y;
+                const totalDist = Math.sqrt(xDist * xDist + yDist * yDist);
+                
+                if (totalDist < human.radius + otherHuman.radius) {
+                    canMoveY = false;
+                }
+            });
+        }
         
         // If human is stuck, teleport them to a random door
         if (isStuck) {
@@ -489,6 +495,8 @@ function updateHumans() {
             // Reset vision growth for teleported humans
             human.visionDistance = 0;
             human.visionGrowthStartTime = currentTime;
+            // Give immunity after teleport
+            human.collisionImmunityEndTime = currentTime + 5000;
         } else {
             // Apply movement if allowed
             if (canMoveX) {
@@ -496,6 +504,7 @@ function updateHumans() {
             } else {
                 // Bounce off obstacle
                 human.direction = Math.PI - human.direction;
+                human.targetDirection = human.direction;
             }
             
             if (canMoveY) {
@@ -503,6 +512,7 @@ function updateHumans() {
             } else {
                 // Bounce off obstacle
                 human.direction = -human.direction;
+                human.targetDirection = human.direction;
             }
         }
         
@@ -510,17 +520,21 @@ function updateHumans() {
         if (human.x - human.radius < 0) {
             human.x = human.radius;
             human.direction = Math.PI - human.direction;
+            human.targetDirection = human.direction;
         } else if (human.x + human.radius > canvas.width) {
             human.x = canvas.width - human.radius;
             human.direction = Math.PI - human.direction;
+            human.targetDirection = human.direction;
         }
         
         if (human.y - human.radius < 0) {
             human.y = human.radius;
             human.direction = -human.direction;
+            human.targetDirection = human.direction;
         } else if (human.y + human.radius > canvas.height) {
             human.y = canvas.height - human.radius;
             human.direction = -human.direction;
+            human.targetDirection = human.direction;
         }
         
         // Check if human can see the player
@@ -568,7 +582,7 @@ function isPlayerInVision(human) {
 function isLineOfSightBlocked(x1, y1, x2, y2) {
     // Check each object to see if it blocks the line of sight
     for (const obj of roomObjects) {
-        // Check if line intersects with the rectangle
+        // Check intersection with all four sides of the object
         if (lineIntersectsRect(x1, y1, x2, y2, obj.x, obj.y, obj.width, obj.height)) {
             return true;
         }
@@ -770,14 +784,48 @@ function drawHumans() {
 function drawSpeechBubble(human, text) {
     ctx.save();
     
-    const bubbleWidth = 120;
-    const bubbleHeight = 40;
-    const bubblePadding = 10;
-    const arrowSize = 10;
+    // Measure the text to calculate bubble size
+    ctx.font = '12px Arial';
     
-    // Position bubble above human
-    const bubbleX = human.x - bubbleWidth / 2;
-    const bubbleY = human.y - human.radius - bubbleHeight - arrowSize - 5;
+    // Split the text into words and find optimal line breaks
+    const words = text.split(' ');
+    const bubblePadding = 10;
+    const maxBubbleWidth = 150; // Maximum width before wrapping
+    const maxLineWidth = maxBubbleWidth - 2 * bubblePadding;
+    const arrowSize = 10;
+    const lineHeight = 16;
+    
+    let lines = [];
+    let currentLine = words[0];
+    
+    for (let i = 1; i < words.length; i++) {
+        const testLine = currentLine + ' ' + words[i];
+        const metrics = ctx.measureText(testLine);
+        
+        if (metrics.width > maxLineWidth) {
+            lines.push(currentLine);
+            currentLine = words[i];
+        } else {
+            currentLine = testLine;
+        }
+    }
+    lines.push(currentLine);
+    
+    // Calculate bubble dimensions based on text
+    const bubbleWidth = Math.min(maxBubbleWidth, Math.max(...lines.map(line => ctx.measureText(line).width)) + 2 * bubblePadding);
+    const bubbleHeight = lines.length * lineHeight + 2 * bubblePadding;
+    
+    // Position bubble above human, ensuring it stays within canvas
+    let bubbleX = human.x - bubbleWidth / 2;
+    let bubbleY = human.y - human.radius - bubbleHeight - arrowSize - 5;
+    
+    // Ensure bubble stays within canvas bounds
+    bubbleX = Math.max(5, Math.min(canvas.width - bubbleWidth - 5, bubbleX));
+    bubbleY = Math.max(5, bubbleY);
+    
+    // Adjust arrow position if bubble had to be repositioned
+    const arrowX = human.x;
+    const arrowBaseX = Math.max(bubbleX + arrowSize, Math.min(bubbleX + bubbleWidth - arrowSize, arrowX));
     
     // Draw bubble background
     ctx.fillStyle = 'white';
@@ -792,47 +840,33 @@ function drawSpeechBubble(human, text) {
     
     // Bubble arrow
     ctx.beginPath();
-    ctx.moveTo(human.x, human.y - human.radius - 5);
-    ctx.lineTo(human.x - arrowSize, bubbleY + bubbleHeight);
-    ctx.lineTo(human.x + arrowSize, bubbleY + bubbleHeight);
+    if (bubbleY + bubbleHeight < human.y - human.radius - 5) {
+        // Normal arrow pointing down
+        ctx.moveTo(arrowX, human.y - human.radius - 5);
+        ctx.lineTo(arrowBaseX - arrowSize, bubbleY + bubbleHeight);
+        ctx.lineTo(arrowBaseX + arrowSize, bubbleY + bubbleHeight);
+    } else {
+        // If bubble is at top of screen, draw arrow on the side
+        const arrowY = human.y;
+        const sideX = (human.x < canvas.width / 2) ? bubbleX + bubbleWidth : bubbleX;
+        const arrowDir = (human.x < canvas.width / 2) ? 1 : -1;
+        
+        ctx.moveTo(sideX, arrowY);
+        ctx.lineTo(sideX - arrowDir * arrowSize, arrowY - arrowSize);
+        ctx.lineTo(sideX - arrowDir * arrowSize, arrowY + arrowSize);
+    }
     ctx.closePath();
     ctx.fill();
     ctx.stroke();
     
     // Draw text
     ctx.fillStyle = 'black';
-    ctx.font = '12px Arial';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
     
-    // Wrap text to fit bubble
-    const words = text.split(' ');
-    let line = '';
-    let lines = [];
-    const maxWidth = bubbleWidth - 2 * bubblePadding;
-    
-    for (let i = 0; i < words.length; i++) {
-        const testLine = line + words[i] + ' ';
-        const metrics = ctx.measureText(testLine);
-        const testWidth = metrics.width;
-        
-        if (testWidth > maxWidth && i > 0) {
-            lines.push(line);
-            line = words[i] + ' ';
-        } else {
-            line = testLine;
-        }
-    }
-    lines.push(line);
-    
-    // Calculate vertical position for centering
-    const lineHeight = 14;
-    let textY = bubbleY + bubblePadding + (bubbleHeight - lines.length * lineHeight) / 2;
-    
-    // Draw each line
-    for (let i = 0; i < lines.length; i++) {
-        ctx.fillText(lines[i], human.x, textY + i * lineHeight);
-    }
+    lines.forEach((line, index) => {
+        ctx.fillText(line, bubbleX + bubblePadding, bubbleY + bubblePadding + index * lineHeight);
+    });
     
     ctx.restore();
 }
