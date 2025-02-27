@@ -278,25 +278,18 @@ export class Human {
         // Draw vision triangle with line-of-sight consideration
         const rayCount = 20; // Number of rays to cast
         
+        // Get roomObjects from game state (imported at the top)
+        const { roomObjects } = window.gameState || { roomObjects: [] };
+        
         for (let i = 0; i <= rayCount; i++) {
             const rayAngle = leftAngle + (rightAngle - leftAngle) * (i / rayCount);
             const rayLength = this.visionDistance; // Use current vision distance
             
-            // Cast a ray in this direction
-            const endX = this.x + Math.cos(rayAngle) * rayLength;
-            const endY = this.y + Math.sin(rayAngle) * rayLength;
+            // Cast a ray in this direction and find the closest intersection
+            const intersection = calculateVisionRay(this.x, this.y, rayAngle, rayLength, roomObjects);
             
-            // Find the closest intersection with an object
-            let minT = 1; // Parameter along the ray (0 to 1)
-            
-            // This will be handled by the actual ray-casting logic in the game
-            // We'll just use the calculated endpoints here
-            
-            // Calculate the actual visible endpoint
-            const visibleX = this.x + minT * (endX - this.x);
-            const visibleY = this.y + minT * (endY - this.y);
-            
-            ctx.lineTo(visibleX, visibleY);
+            // Add the visible endpoint to our vision cone
+            ctx.lineTo(intersection.x, intersection.y);
         }
         
         ctx.closePath();

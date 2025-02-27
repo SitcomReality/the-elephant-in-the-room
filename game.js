@@ -333,3 +333,10 @@ export const getGameState = () => ({
     humans,
     doors
 });
+
+// Make game state globally accessible
+window.gameState = {
+    canvas,
+    ctx,
+    roomObjects
+};

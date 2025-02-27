@@ -12,7 +12,7 @@ class TrunkNode {
     }
 
     update(targetX, targetY, stiffness = 0.1) {
-        // Store previous position for constraint solving
+        // Store previous position for velocity calculation
         this.prevX = this.x;
         this.prevY = this.y;
         
@@ -39,7 +39,7 @@ export class Player {
         this.trunkWidth = 10;
         this.trunkAngle = 0;
         this.trunkNodes = [];
-        this.numNodes = 5; // Number of nodes in trunk
+        this.numNodes = 7; // Increased from 5 to 7
         this.trunkSwinging = false;
         this.swingForce = 15; // Force applied during swing
         this.swingDecay = 0.9; // How quickly the swing force decays
@@ -176,17 +176,35 @@ export class Player {
                     this.currentSwingForce = 0;
                 }
             }
+        } else {
+            // Even when not swinging, add a small force towards the mouse for the last node
+            const lastNode = this.trunkNodes[this.trunkNodes.length - 1];
+            const dx = mouse.x - lastNode.x;
+            const dy = mouse.y - lastNode.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            
+            if (dist > 0) {
+                // Normalize and apply a gentle force
+                const dirX = dx / dist;
+                const dirY = dy / dist;
+                lastNode.x += dirX * 0.8;
+                lastNode.y += dirY * 0.8;
+            }
         }
         
-        // Verlet integration to update nodes
+        // Update all nodes (except first)
         for (let i = 1; i < this.trunkNodes.length; i++) {
             const node = this.trunkNodes[i];
+            const prevNode = this.trunkNodes[i - 1];
             
             if (i !== 1 || !this.trunkSwinging) {
+                // Add a bit of natural movement to the trunk
+                const wobble = Math.sin(Date.now() / 300 + i) * 0.2;
+                const targetAngle = this.trunkAngle + wobble;
+                
                 // For all nodes except the first and the last during swing
-                const prevNode = this.trunkNodes[i - 1];
-                node.update(prevNode.x + Math.cos(this.trunkAngle) * this.trunkLength, 
-                           prevNode.y + Math.sin(this.trunkAngle) * this.trunkLength, 0.3);
+                node.update(prevNode.x + Math.cos(targetAngle) * this.trunkLength, 
+                           prevNode.y + Math.sin(targetAngle) * this.trunkLength, 0.3);
             }
         }
         
@@ -223,14 +241,20 @@ export class Player {
             }
         }
         
-        // Check for collisions between trunk nodes and room objects
+        // Always check for collisions between all trunk nodes and room objects
         this.checkTrunkCollisions(roomObjects);
     }
     
     checkTrunkCollisions(roomObjects) {
-        // Skip the first node (attached to elephant)
+        // Check all nodes (except the first one attached to elephant)
         for (let i = 1; i < this.trunkNodes.length; i++) {
             const node = this.trunkNodes[i];
+            const prevNode = this.trunkNodes[i - 1];
+            
+            // Calculate node velocity by comparing current and previous positions
+            const nodeVx = node.x - node.prevX;
+            const nodeVy = node.y - node.prevY;
+            const nodeSpeed = Math.sqrt(nodeVx * nodeVx + nodeVy * nodeVy);
             
             roomObjects.forEach(obj => {
                 // Check if node is colliding with object
@@ -238,16 +262,9 @@ export class Player {
                     node.x, node.y, node.radius,
                     obj.x, obj.y, obj.width, obj.height
                 )) {
-                    // If this is during an active swing, apply force to object
-                    if (this.trunkSwinging && this.currentSwingForce > 1.0) {
-                        // Initialize velocity if needed
-                        if (obj.vx === undefined) {
-                            obj.vx = 0;
-                            obj.vy = 0;
-                        }
-                        
+                    // Whether swinging or not, apply force if the trunk is moving fast enough
+                    if (nodeSpeed > 1.0) {
                         // Calculate force direction (from previous node to this node)
-                        const prevNode = this.trunkNodes[i - 1];
                         let forceX = node.x - prevNode.x;
                         let forceY = node.y - prevNode.y;
                         
@@ -257,12 +274,20 @@ export class Player {
                             forceX /= forceMag;
                             forceY /= forceMag;
                             
-                            // Apply force based on object mass and current swing force
-                            const forceFactor = this.currentSwingForce / (obj.mass || 1);
-                            obj.vx += forceX * forceFactor;
-                            obj.vy += forceY * forceFactor;
+                            // Apply force based on object mass and node speed
+                            const forceFactor = nodeSpeed / (obj.mass || 1);
+                            // Limit the maximum force to prevent objects from flying too crazily
+                            const maxForce = this.trunkSwinging ? 15 : 5;
+                            const appliedForce = Math.min(forceFactor, maxForce);
+                            
+                            obj.vx += forceX * appliedForce;
+                            obj.vy += forceY * appliedForce;
                         }
                     }
+                    
+                    // Make the trunk node bounce off the object slightly
+                    node.x += (node.x - obj.x) * 0.1;
+                    node.y += (node.y - obj.y) * 0.1;
                 }
             });
         }
