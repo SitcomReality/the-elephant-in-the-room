@@ -372,9 +372,10 @@ function updateHumans() {
             human.visionDistance = human.maxVisionDistance * progress;
         }
         
-        // Store previous position
+        // Store previous position and direction
         const previousX = human.x;
         const previousY = human.y;
+        const previousDirection = human.direction;
         
         // Handle direction changes with smooth rotation
         if (currentTime - human.changeDirectionTime > human.directionChangeInterval && !human.isRotating) {
@@ -422,6 +423,7 @@ function updateHumans() {
         let canMoveX = true;
         let canMoveY = true;
         let isStuck = false;
+        let directionChanged = false;
         
         // Check for collisions with room objects
         roomObjects.forEach(obj => {
@@ -464,11 +466,12 @@ function updateHumans() {
                 if (totalDistance < human.radius + otherHuman.radius) {
                     canMoveX = false;
                     
-                    // Make humans talk to each other
-                    if (currentTime - human.lastSpeechTime > 5000 && currentTime - otherHuman.lastSpeechTime > 5000) {
+                    // Make humans talk to each other and grant collision immunity
+                    if (currentTime - human.lastSpeechTime > 5000) {
                         human.speechText = getRandomDialogue(humanCollisionDialogue);
                         human.lastSpeechTime = currentTime;
-                        human.speechEndTime = currentTime + 3000; // Show for 3 seconds
+                        human.speechEndTime = currentTime + 3000; // Show speech for 3 seconds
+                        human.collisionImmunityEndTime = currentTime + 5000; // 5 seconds of collision immunity
                     }
                 }
                 
@@ -505,6 +508,7 @@ function updateHumans() {
                 // Bounce off obstacle
                 human.direction = Math.PI - human.direction;
                 human.targetDirection = human.direction;
+                directionChanged = true;
             }
             
             if (canMoveY) {
@@ -513,28 +517,39 @@ function updateHumans() {
                 // Bounce off obstacle
                 human.direction = -human.direction;
                 human.targetDirection = human.direction;
+                directionChanged = true;
             }
         }
         
-        // Bounce off walls
+        // Check if bounced off walls
         if (human.x - human.radius < 0) {
             human.x = human.radius;
             human.direction = Math.PI - human.direction;
             human.targetDirection = human.direction;
+            directionChanged = true;
         } else if (human.x + human.radius > canvas.width) {
             human.x = canvas.width - human.radius;
             human.direction = Math.PI - human.direction;
             human.targetDirection = human.direction;
+            directionChanged = true;
         }
         
         if (human.y - human.radius < 0) {
             human.y = human.radius;
             human.direction = -human.direction;
             human.targetDirection = human.direction;
+            directionChanged = true;
         } else if (human.y + human.radius > canvas.height) {
             human.y = canvas.height - human.radius;
             human.direction = -human.direction;
             human.targetDirection = human.direction;
+            directionChanged = true;
+        }
+        
+        // Reset vision when direction changes due to bouncing
+        if (directionChanged) {
+            human.visionDistance = 0;
+            human.visionGrowthStartTime = currentTime;
         }
         
         // Check if human can see the player
