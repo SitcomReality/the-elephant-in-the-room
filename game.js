@@ -178,8 +178,15 @@ function spawnHuman() {
         radius: 15,
         speed: 1,
         direction: door.direction,
+        targetDirection: door.direction, // New property for smooth rotation
+        rotationStartTime: 0, // When rotation started
+        rotationDuration: 0, // How long rotation should take
+        isRotating: false, // Flag for rotation state
         fovAngle: Math.PI / 3, // 60 degrees field of view
-        visionDistance: 200,
+        visionDistance: 0, // Start with no vision
+        maxVisionDistance: 200, // Maximum vision distance
+        visionGrowthStartTime: Date.now(), // When vision started growing
+        visionGrowthDuration: 2000, // Vision grows over 2 seconds
         visionColor: 'rgba(255, 0, 0, 0.3)',
         changeDirectionTime: 0,
         directionChangeInterval: 3000, // Change direction every 3 seconds
@@ -347,19 +354,6 @@ function updateObjects() {
     });
 }
 
-function circleRectangleCollision(circleX, circleY, circleRadius, rectX, rectY, rectWidth, rectHeight) {
-    // Find closest point on rectangle to circle
-    const closestX = Math.max(rectX, Math.min(circleX, rectX + rectWidth));
-    const closestY = Math.max(rectY, Math.min(circleY, rectY + rectHeight));
-    
-    // Calculate distance between closest point and circle center
-    const distanceX = circleX - closestX;
-    const distanceY = circleY - closestY;
-    const distanceSquared = distanceX * distanceX + distanceY * distanceY;
-    
-    return distanceSquared < (circleRadius * circleRadius);
-}
-
 function updateHumans() {
     const currentTime = Date.now();
     
@@ -370,14 +364,54 @@ function updateHumans() {
     }
     
     humans.forEach(human => {
+        // Update vision distance for newly spawned humans
+        if (human.visionDistance < human.maxVisionDistance) {
+            const elapsed = currentTime - human.visionGrowthStartTime;
+            const progress = Math.min(elapsed / human.visionGrowthDuration, 1);
+            human.visionDistance = human.maxVisionDistance * progress;
+        }
+        
         // Store previous position
         const previousX = human.x;
         const previousY = human.y;
         
-        // Random direction change
-        if (currentTime - human.changeDirectionTime > human.directionChangeInterval) {
-            human.direction += (Math.random() - 0.5) * Math.PI / 2; // Change by up to 45 degrees
-            human.changeDirectionTime = currentTime;
+        // Handle direction changes with smooth rotation
+        if (currentTime - human.changeDirectionTime > human.directionChangeInterval && !human.isRotating) {
+            // Set new target direction
+            human.targetDirection = human.direction + (Math.random() - 0.5) * Math.PI / 2;
+            human.rotationStartTime = currentTime;
+            human.rotationDuration = 500 + Math.random() * 500; // Random duration between 500-1000ms
+            human.isRotating = true;
+            human.changeDirectionTime = currentTime; // Reset timer
+        }
+        
+        // Update direction with smooth rotation
+        if (human.isRotating) {
+            const elapsed = currentTime - human.rotationStartTime;
+            const progress = Math.min(elapsed / human.rotationDuration, 1);
+            
+            let easingFactor;
+            if (progress <= 0.75) {
+                // First 75% of rotation uses ease-out
+                easingFactor = 1 - Math.pow(1 - progress / 0.75, 3);
+            } else {
+                // Last 25% uses linear movement
+                easingFactor = 0.75 + (progress - 0.75) / 0.25;
+            }
+            
+            // Calculate angle difference, accounting for wrapping
+            let angleDiff = human.targetDirection - human.direction;
+            while (angleDiff > Math.PI) angleDiff -= 2 * Math.PI;
+            while (angleDiff < -Math.PI) angleDiff += 2 * Math.PI;
+            
+            // Apply easing to rotation
+            human.direction = human.direction + angleDiff * easingFactor - (human.isRotating && progress < 1 ? angleDiff * easingFactor : 0);
+            
+            // Check if rotation is complete
+            if (progress >= 1) {
+                human.direction = human.targetDirection;
+                human.isRotating = false;
+            }
         }
         
         // Calculate new position
@@ -451,6 +485,10 @@ function updateHumans() {
             human.y = door.y;
             // Face away from player
             human.direction = Math.atan2(player.y - human.y, player.x - human.x) + Math.PI;
+            human.targetDirection = human.direction; // Reset target direction too
+            // Reset vision growth for teleported humans
+            human.visionDistance = 0;
+            human.visionGrowthStartTime = currentTime;
         } else {
             // Apply movement if allowed
             if (canMoveX) {
@@ -573,7 +611,7 @@ function drawVisionCone(human) {
     
     for (let i = 0; i <= rayCount; i++) {
         const rayAngle = leftAngle + (rightAngle - leftAngle) * (i / rayCount);
-        const rayLength = human.visionDistance;
+        const rayLength = human.visionDistance; // Use current vision distance
         
         // Cast a ray in this direction
         const endX = human.x + Math.cos(rayAngle) * rayLength;
@@ -815,6 +853,19 @@ function endGame() {
     gameOver = true;
     document.getElementById('final-score').textContent = score;
     document.getElementById('game-over').classList.remove('hidden');
+}
+
+function circleRectangleCollision(circleX, circleY, circleRadius, rectX, rectY, rectWidth, rectHeight) {
+    // Find closest point on rectangle to circle
+    const closestX = Math.max(rectX, Math.min(circleX, rectX + rectWidth));
+    const closestY = Math.max(rectY, Math.min(circleY, rectY + rectHeight));
+    
+    // Calculate distance between closest point and circle center
+    const distanceX = circleX - closestX;
+    const distanceY = circleY - closestY;
+    const distanceSquared = distanceX * distanceX + distanceY * distanceY;
+    
+    return distanceSquared < (circleRadius * circleRadius);
 }
 
 function gameLoop() {
