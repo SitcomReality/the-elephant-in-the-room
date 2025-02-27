@@ -5,6 +5,7 @@ import { RoomObject } from './objects.js';
 import { Human } from './human.js';
 import { renderSpeechBubble, renderScoreMultiplier } from './ui.js';
 import { circleRectangleCollision, lineIntersectsRect } from './physics.js';
+import { upgrades, levelUpQuotes } from './progression.js';
 
 // Game canvas and context
 const canvas = document.getElementById('gameCanvas');
@@ -30,6 +31,19 @@ let multiplierDecayDelay = 3000; // Start decaying after 3 seconds of no increas
 let baseDecayRate = 0.01; // Base decay rate per second
 let multiplierRecentlyIncreased = false;
 let recentlyIncreasedReset = 0;
+
+// Level progression system
+let playerLevel = 1;
+let levelUpThresholds = [100, 250, 450, 700, 1000, 1500, 2000, 3000, 4000, 5000]; // Score needed for each level
+let isLevelingUp = false;
+let availableUpgrades = [];
+let selectedUpgrades = [];
+
+// Pickup system
+let lastPickupSpawnTime = 0;
+let pickupSpawnInterval = 10000; // 10 seconds
+let pickupLifetime = 3000; // 3 seconds
+let activePickup = null;
 
 // Input state
 export const keys = {
@@ -69,7 +83,7 @@ const doors = [
 
 // Input handling
 window.addEventListener('keydown', (e) => {
-    if (gameOver) return;
+    if (gameOver || isLevelingUp) return;
     
     switch (e.key) {
         case 'ArrowUp':
@@ -127,12 +141,53 @@ window.addEventListener('mousemove', (e) => {
     const rect = canvas.getBoundingClientRect();
     mouse.x = e.clientX - rect.left;
     mouse.y = e.clientY - rect.top;
+    
+    // If in level up screen, handle card hover
+    if (isLevelingUp) {
+        const cards = document.querySelectorAll('.upgrade-card');
+        cards.forEach(card => {
+            const cardRect = card.getBoundingClientRect();
+            const isHovered = (
+                e.clientX >= cardRect.left && 
+                e.clientX <= cardRect.right && 
+                e.clientY >= cardRect.top && 
+                e.clientY <= cardRect.bottom
+            );
+            
+            if (isHovered) {
+                card.style.transform = 'scale(1.05)';
+                card.style.borderColor = '#ffcc00';
+                card.style.boxShadow = '0 0 15px rgba(255, 204, 0, 0.5)';
+            } else {
+                card.style.transform = 'scale(1.0)';
+                card.style.borderColor = '#555';
+                card.style.boxShadow = 'none';
+            }
+        });
+    }
 });
 
 window.addEventListener('mousedown', (e) => {
     if (gameOver) return;
-    mouse.down = true;
-    player.startTrunkSwing();
+    
+    if (isLevelingUp) {
+        // Check if we're clicking on an upgrade card
+        const cards = document.querySelectorAll('.upgrade-card');
+        cards.forEach((card, index) => {
+            const cardRect = card.getBoundingClientRect();
+            if (
+                e.clientX >= cardRect.left && 
+                e.clientX <= cardRect.right && 
+                e.clientY >= cardRect.top && 
+                e.clientY <= cardRect.bottom
+            ) {
+                selectUpgrade(index);
+            }
+        });
+    } else {
+        mouse.down = true;
+        player.startTrunkSwing();
+    }
 });
 
 window.addEventListener('mouseup', () => {
@@ -150,10 +205,15 @@ function resetGame() {
     score = 0;
     gameStartTime = Date.now();
     lastHumanSpawnTime = 0;
+    lastPickupSpawnTime = 0;
     scoreMultiplier = 0;
     lastMultiplierIncreaseTime = 0;
     
-    // Reset player position
+    // Reset level progression
+    playerLevel = 1;
+    selectedUpgrades = [];
+    
+    // Reset player position and properties
     player.reset(canvas.width / 2, canvas.height / 2);
     
     // Reset room objects to their original positions
@@ -166,6 +226,12 @@ function resetGame() {
     
     // Add initial human
     spawnHuman();
+    
+    // Clear any active pickup
+    activePickup = null;
+    
+    // Update UI
+    updateLevelProgressUI();
     
     // Hide game over screen
     document.getElementById('game-over').classList.add('hidden');
@@ -184,6 +250,36 @@ function spawnHuman() {
 
 function updatePlayer() {
     player.update(keys, mouse, canvas.width, canvas.height, roomObjects);
+    
+    // Check for collision with active pickup
+    if (activePickup) {
+        const playerRect = {
+            x: player.x - player.radius,
+            y: player.y - player.radius,
+            width: player.radius * 2,
+            height: player.radius * 2
+        };
+        
+        const pickupRect = {
+            x: activePickup.x,
+            y: activePickup.y,
+            width: 40,
+            height: 40
+        };
+        
+        if (rectsIntersect(playerRect, pickupRect)) {
+            collectPickup();
+        }
+    }
+}
+
+function rectsIntersect(rect1, rect2) {
+    return (
+        rect1.x < rect2.x + rect2.width &&
+        rect1.x + rect1.width > rect2.x &&
+        rect1.y < rect2.y + rect2.height &&
+        rect1.y + rect1.height > rect2.y
+    );
 }
 
 function updateObjects() {
@@ -326,7 +422,13 @@ function updateScore(currentTime) {
     
     // Apply multiplier
     const multiplierBonus = scoreMultiplier * baseScore;
-    score = Math.floor(baseScore + multiplierBonus);
+    const newScore = Math.floor(baseScore + multiplierBonus);
+    
+    // Check for level up when score changes
+    if (score !== newScore) {
+        score = newScore;
+        checkLevelProgression();
+    }
     
     // Update display
     document.getElementById('score').textContent = `Score: ${score}`;
@@ -335,10 +437,262 @@ function updateScore(currentTime) {
     lastUpdateTime = currentTime;
 }
 
+function updateLevelProgressUI() {
+    // Find next level threshold
+    const nextLevelIndex = playerLevel - 1;
+    const previousThreshold = nextLevelIndex > 0 ? levelUpThresholds[nextLevelIndex - 1] : 0;
+    const nextThreshold = levelUpThresholds[nextLevelIndex] || levelUpThresholds[levelUpThresholds.length - 1];
+    
+    // Calculate progress to next level
+    const progress = Math.min(
+        (score - previousThreshold) / (nextThreshold - previousThreshold) * 100, 
+        100
+    );
+    
+    // Update progress bar
+    const progressBar = document.getElementById('level-progress-bar');
+    progressBar.style.width = `${progress}%`;
+    
+    // Update level indicator
+    document.getElementById('level-indicator').textContent = `Level ${playerLevel}`;
+}
+
+function checkLevelProgression() {
+    // Check if we've crossed any threshold
+    if (playerLevel <= levelUpThresholds.length && score >= levelUpThresholds[playerLevel - 1]) {
+        // Level up!
+        playerLevel++;
+        showLevelUpScreen();
+    }
+    
+    // Update the UI
+    updateLevelProgressUI();
+}
+
+function showLevelUpScreen() {
+    isLevelingUp = true;
+    
+    // Create level up screen if it doesn't exist
+    let levelUpScreen = document.getElementById('level-up-screen');
+    if (!levelUpScreen) {
+        levelUpScreen = document.createElement('div');
+        levelUpScreen.id = 'level-up-screen';
+        document.getElementById('game-container').appendChild(levelUpScreen);
+    }
+    
+    // Generate available upgrades (3 random ones)
+    generateAvailableUpgrades();
+    
+    // Get a random level up quote
+    const randomQuote = levelUpQuotes[Math.floor(Math.random() * levelUpQuotes.length)];
+    
+    // Create level up screen content
+    levelUpScreen.innerHTML = `
+        <h2 id="level-up-title">Level ${playerLevel}</h2>
+        <p id="level-up-quote">"${randomQuote}"</p>
+        <div id="upgrade-options">
+            ${availableUpgrades.map((upgrade, index) => `
+                <div class="upgrade-card" data-index="${index}">
+                    <div class="upgrade-icon">${upgrade.icon}</div>
+                    <h3 class="upgrade-title">${upgrade.title}</h3>
+                    <p class="upgrade-description">${upgrade.description}</p>
+                </div>
+            `).join('')}
+        </div>
+    `;
+    
+    // Add click handlers
+    const cards = document.querySelectorAll('.upgrade-card');
+    cards.forEach((card, index) => {
+        card.addEventListener('click', () => selectUpgrade(index));
+    });
+    
+    // Show the screen
+    levelUpScreen.style.display = 'flex';
+}
+
+function generateAvailableUpgrades() {
+    // Start with all possible upgrades
+    let possibleUpgrades = [...upgrades];
+    
+    // Filter out any one-time upgrades that have already been selected
+    possibleUpgrades = possibleUpgrades.filter(upgrade => 
+        !(upgrade.oneTime && selectedUpgrades.includes(upgrade.id))
+    );
+    
+    // Randomly select 3 upgrades from the available pool
+    availableUpgrades = [];
+    for (let i = 0; i < 3; i++) {
+        if (possibleUpgrades.length === 0) break;
+        
+        const randomIndex = Math.floor(Math.random() * possibleUpgrades.length);
+        availableUpgrades.push(possibleUpgrades[randomIndex]);
+        
+        // Remove this upgrade from the pool if we don't want duplicates in the selection
+        possibleUpgrades.splice(randomIndex, 1);
+    }
+}
+
+function selectUpgrade(index) {
+    const selectedUpgrade = availableUpgrades[index];
+    if (!selectedUpgrade) return;
+    
+    // Apply the upgrade effect
+    applyUpgrade(selectedUpgrade);
+    
+    // Add to selected upgrades list
+    selectedUpgrades.push(selectedUpgrade.id);
+    
+    // Hide level up screen
+    const levelUpScreen = document.getElementById('level-up-screen');
+    if (levelUpScreen) {
+        levelUpScreen.style.display = 'none';
+    }
+    
+    // Unpause game
+    isLevelingUp = false;
+    
+    // Teleport all humans to random doors as a grace period
+    teleportAllHumans();
+}
+
+function applyUpgrade(upgrade) {
+    switch (upgrade.id) {
+        case 'trunk_length':
+            player.addTrunkNode();
+            break;
+        case 'movement_speed':
+            player.speed += 0.5;
+            break;
+        case 'trunk_strength':
+            player.swingForce += 2;
+            break;
+        case 'pickup_frequency':
+            pickupSpawnInterval = Math.max(3000, pickupSpawnInterval - 1000); // Min 3 seconds
+            break;
+    }
+}
+
+function teleportAllHumans() {
+    const currentTime = Date.now();
+    humans.forEach(human => {
+        human.teleportToDoor(doors, player, currentTime);
+    });
+}
+
+function updatePickups() {
+    const currentTime = Date.now();
+    
+    // Check if we need to spawn a new pickup
+    if (!activePickup && currentTime - lastPickupSpawnTime > pickupSpawnInterval) {
+        spawnPickup();
+        lastPickupSpawnTime = currentTime;
+    }
+    
+    // Check if pickup has expired
+    if (activePickup && currentTime - activePickup.spawnTime > pickupLifetime) {
+        removePickup();
+    }
+}
+
+function spawnPickup() {
+    // Determine pickup type (50/50 chance)
+    const isScorePickup = Math.random() > 0.5;
+    
+    // Find a position away from the player and not inside objects
+    let x, y;
+    let validPosition = false;
+    
+    while (!validPosition) {
+        x = Math.random() * (canvas.width - 80) + 40;
+        y = Math.random() * (canvas.height - 80) + 40;
+        
+        // Check distance from player (should be at least 100px away)
+        const distToPlayer = Math.sqrt(
+            Math.pow(x - player.x, 2) + 
+            Math.pow(y - player.y, 2)
+        );
+        
+        if (distToPlayer < 100) continue;
+        
+        // Check collision with objects
+        let collides = false;
+        for (const obj of roomObjects) {
+            if (rectsIntersect(
+                { x, y, width: 40, height: 40 },
+                { x: obj.x, y: obj.y, width: obj.width, height: obj.height }
+            )) {
+                collides = true;
+                break;
+            }
+        }
+        
+        validPosition = !collides;
+    }
+    
+    // Create the pickup
+    activePickup = {
+        type: isScorePickup ? 'score' : 'reset',
+        x,
+        y,
+        spawnTime: Date.now()
+    };
+}
+
+function collectPickup() {
+    if (!activePickup) return;
+    
+    // Apply pickup effect
+    if (activePickup.type === 'score') {
+        // Increase score by 10%
+        score += Math.floor(score * 0.1);
+        checkLevelProgression();
+    } else if (activePickup.type === 'reset') {
+        // Teleport all humans to random doors
+        teleportAllHumans();
+    }
+    
+    // Remove the pickup
+    removePickup();
+}
+
+function removePickup() {
+    // Reset pickup cooldown
+    lastPickupSpawnTime = Date.now();
+    activePickup = null;
+}
+
 function endGame() {
     gameOver = true;
     document.getElementById('final-score').textContent = score;
     document.getElementById('game-over').classList.remove('hidden');
+}
+
+function renderPickup() {
+    if (!activePickup) return;
+    
+    // Determine class based on pickup type
+    const className = activePickup.type === 'score' ? 'pickup-score' : 'pickup-reset';
+    const text = activePickup.type === 'score' ? '+10%' : 'Reset';
+    
+    // Draw pickup
+    ctx.fillStyle = activePickup.type === 'score' ? '#0066ff' : '#ff3300';
+    ctx.fillRect(activePickup.x, activePickup.y, 40, 40);
+    
+    // Add glow effect
+    ctx.shadowColor = activePickup.type === 'score' ? '#0099ff' : '#ff6600';
+    ctx.shadowBlur = 10;
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(activePickup.x, activePickup.y, 40, 40);
+    ctx.shadowBlur = 0;
+    
+    // Draw text
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 14px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(text, activePickup.x + 20, activePickup.y + 20);
 }
 
 function render() {
@@ -347,6 +701,11 @@ function render() {
     
     // Draw game objects
     roomObjects.forEach(obj => obj.render(ctx));
+    
+    // Draw active pickup
+    if (activePickup) {
+        renderPickup();
+    }
     
     // Draw humans
     humans.forEach(human => {
@@ -369,11 +728,15 @@ function gameLoop() {
     const currentTime = Date.now();
     
     if (!gameOver) {
-        // Update game objects
-        updatePlayer();
-        updateObjects();
-        updateHumans();
-        updateMultiplier(currentTime);
+        if (!isLevelingUp) {
+            // Update game objects
+            updatePlayer();
+            updateObjects();
+            updateHumans();
+            updateMultiplier(currentTime);
+            updatePickups();
+        }
+        
         updateScore(currentTime);
         
         // Render everything
@@ -388,6 +751,18 @@ function gameLoop() {
 spawnHuman();
 // First human always faces away from player
 humans[0].direction = Math.atan2(player.y - humans[0].y, player.x - humans[0].x) + Math.PI;
+
+// Create level progress UI
+const levelProgressContainer = document.createElement('div');
+levelProgressContainer.id = 'level-progress-container';
+levelProgressContainer.innerHTML = '<div id="level-progress-bar"></div>';
+
+const levelIndicator = document.createElement('div');
+levelIndicator.id = 'level-indicator';
+levelIndicator.textContent = 'Level 1';
+
+document.getElementById('game-container').appendChild(levelProgressContainer);
+document.getElementById('game-container').appendChild(levelIndicator);
 
 // Start the game
 resetGame();

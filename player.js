@@ -70,6 +70,13 @@ export class Player {
         this.trunkAngle = 0;
         this.trunkSwinging = false;
         this.currentSwingForce = 0;
+        
+        // Reset speed and other upgradeable properties to defaults
+        this.speed = 3;
+        this.swingForce = 15;
+        
+        // Reset the trunk to initial configuration
+        this.numNodes = 7;
         this.initTrunk();
     }
     
@@ -291,6 +298,25 @@ export class Player {
                 }
             });
         }
+    }
+    
+    addTrunkNode() {
+        // Get the last node's position
+        const lastNode = this.trunkNodes[this.trunkNodes.length - 1];
+        const secondLastNode = this.trunkNodes[this.trunkNodes.length - 2];
+        
+        // Calculate direction from second-last to last node
+        const dx = lastNode.x - secondLastNode.x;
+        const dy = lastNode.y - secondLastNode.y;
+        const angle = Math.atan2(dy, dx);
+        
+        // Create new node extending in the same direction
+        const newX = lastNode.x + Math.cos(angle) * this.trunkLength;
+        const newY = lastNode.y + Math.sin(angle) * this.trunkLength;
+        
+        // Add the new node
+        this.trunkNodes.push(new TrunkNode(newX, newY));
+        this.numNodes++;
     }
     
     render(ctx) {
