@@ -48,7 +48,7 @@ let gameOver = false;
 let score = 0;
 let gameStartTime = Date.now();
 let lastHumanSpawnTime = 0;
-let humanSpawnInterval = 10000; // 10 seconds
+let humanSpawnInterval = 12000; // Increased from 10000 to 12000 (12 seconds)
 let gameActive = false; // Track if game has started
 let gamePaused = false; // Track if game is paused
 let lastUpdateTime = Date.now(); // For time-based calculations
@@ -66,7 +66,7 @@ let recentlyIncreasedReset = 0;
 
 // Level progression system
 let playerLevel = 1;
-let levelUpThresholds = [100, 250, 450, 700, 1000, 1500, 2000, 3000, 4000, 5000]; // Score needed for each level
+let levelUpThresholds = [80, 200, 350, 550, 800, 1200, 1600, 2500, 3500, 4500]; // Reduced thresholds
 let isLevelingUp = false;
 let availableUpgrades = [];
 let selectedUpgrades = [];
@@ -366,6 +366,13 @@ function resetGame() {
     
     // Update pause button icon
     updatePauseButtonIcon();
+    
+    // Reset progress bar to 0%
+    document.getElementById('level-progress-bar').style.width = '0%';
+    
+    // Reset score and multiplier
+    score = 0;
+    scoreMultiplier = 0;
 }
 
 function spawnHuman() {
@@ -447,8 +454,12 @@ function updateObjects() {
 }
 
 function increaseMultiplier(currentTime) {
+    // Increase multiplier amount based on number of humans
+    const humanFactor = 1 + (humans.length * 0.2); // Each human adds 20% to the multiplier gain
+    const adjustedIncrease = multiplierIncreaseAmount * humanFactor;
+    
     // Increase multiplier
-    scoreMultiplier = Math.min(scoreMultiplier + multiplierIncreaseAmount, maxMultiplier);
+    scoreMultiplier = Math.min(scoreMultiplier + adjustedIncrease, maxMultiplier);
     lastMultiplierIncreaseTime = currentTime;
     
     // Flag for animation
@@ -480,7 +491,7 @@ function updateMultiplier(currentTime) {
 function updateHumans() {
     const currentTime = Date.now();
     
-    // Spawn new human every 10 seconds
+    // Spawn new human every 12 seconds
     if (currentTime - lastHumanSpawnTime > humanSpawnInterval) {
         spawnHuman();
         lastHumanSpawnTime = currentTime;
@@ -549,7 +560,7 @@ function updateScore(currentTime) {
     if (gamePaused || isLevelingUp) return;
     
     // Calculate base score from time
-    const baseScore = Math.floor((currentTime - gameStartTime) / 1000);
+    const baseScore = Math.floor((currentTime - gameStartTime) / 1000) * 2; // Doubled XP gain
     
     // Apply multiplier
     const multiplierBonus = scoreMultiplier * baseScore;
@@ -574,17 +585,14 @@ function updateLevelProgressUI() {
     const previousThreshold = nextLevelIndex > 0 ? levelUpThresholds[nextLevelIndex - 1] : 0;
     const nextThreshold = levelUpThresholds[nextLevelIndex] || levelUpThresholds[levelUpThresholds.length - 1];
     
-    // Calculate progress to next level - ensure it never decreases
-    const currentProgressElement = document.getElementById('level-progress-bar');
-    const currentProgress = currentProgressElement.style.width ? parseFloat(currentProgressElement.style.width) : 0;
+    // Calculate progress to next level - ensure it's correctly reflecting current level progress
     const calculatedProgress = Math.min(
         (score - previousThreshold) / (nextThreshold - previousThreshold) * 100, 
         100
     );
-    const progress = Math.max(currentProgress, calculatedProgress);
     
     // Update progress bar
-    currentProgressElement.style.width = `${progress}%`;
+    document.getElementById('level-progress-bar').style.width = `${calculatedProgress}%`;
     
     // Update level indicator
     document.getElementById('level-indicator').textContent = `Level ${playerLevel}`;
@@ -604,6 +612,9 @@ function checkLevelProgression() {
 
 function showLevelUpScreen() {
     isLevelingUp = true;
+    
+    // Reset progress bar to 0% for new level
+    document.getElementById('level-progress-bar').style.width = '0%';
     
     // Create level up screen if it doesn't exist
     let levelUpScreen = document.getElementById('level-up-screen');
@@ -684,6 +695,9 @@ function selectUpgrade(index) {
     
     // Unpause game
     isLevelingUp = false;
+    
+    // Reset progress bar to 0% for new level
+    document.getElementById('level-progress-bar').style.width = '0%';
     
     // Teleport all humans to random doors as a grace period
     teleportAllHumans();
