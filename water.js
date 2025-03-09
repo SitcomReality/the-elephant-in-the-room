@@ -136,36 +136,39 @@ export class WaterSystem {
             const radius = 5;
             points = [];
             
-            // Create a small puddle with 6 points
-            for (let i = 0; i < 6; i++) {
-                const angle = (i / 6) * Math.PI * 2;
+            // Create a small puddle with more points (was 6, now 12)
+            for (let i = 0; i < 12; i++) {
+                const angle = (i / 12) * Math.PI * 2;
+                // Add some randomness to radius
+                const randRadius = radius * (0.7 + Math.random() * 0.6);
                 points.push({
-                    x: p.x + Math.cos(angle) * radius,
-                    y: p.y + Math.sin(angle) * radius
+                    x: p.x + Math.cos(angle) * randRadius,
+                    y: p.y + Math.sin(angle) * randRadius
                 });
             }
+            
+            // For single particles, get alpha based on lifetime
+            const remainingLifetime = particles[0].lifetime - (Date.now() - particles[0].creationTime);
+            const alpha = remainingLifetime < 1000 ? (remainingLifetime / 1000) : 1.0;
+            
+            // Draw the single particle with fading
+            this.drawWaterShape(ctx, points, alpha);
         } else {
-            // For blobs with multiple particles, compute convex hull
+            // For multi-particle blobs, compute smoother shape with Bezier curves
             points = this.computeConvexHull(points);
             
-            // Expand slightly and add wobble
+            // Add extra control points for smoother curves
+            points = this.addControlPoints(points);
+            
+            // Expand and add wobble
             points = this.expandAndWobble(points);
+            
+            // Draw the water blob - always fully opaque for pools
+            this.drawWaterShape(ctx, points, 1.0);
         }
-        
-        // Calculate alpha based on the oldest particle's remaining lifetime
-        const oldestParticle = particles.reduce(
-            (oldest, current) => 
-                current.creationTime < oldest.creationTime ? current : oldest, 
-            particles[0]
-        );
-        
-        // Modified alpha calculation: maintain 100% opacity until final second
-        let alpha = 1.0;
-        const remainingLifetime = oldestParticle.lifetime - (Date.now() - oldestParticle.creationTime);
-        if (remainingLifetime < 1000) {
-            alpha = remainingLifetime / 1000; // Linear fade over the final second
-        }
-        
+    }
+    
+    drawWaterShape(ctx, points, alpha) {
         // Draw the water blob
         ctx.save();
         ctx.fillStyle = `rgba(90, 155, 213, ${alpha * 0.7})`;
@@ -174,19 +177,63 @@ export class WaterSystem {
         if (points.length > 0) {
             ctx.moveTo(points[0].x, points[0].y);
             
+            // Use Bezier curves for smoother shape
             for (let i = 1; i < points.length; i++) {
-                ctx.lineTo(points[i].x, points[i].y);
+                const prev = points[i-1];
+                const current = points[i];
+                const next = points[(i+1) % points.length];
+                
+                // Control points for curve
+                const cp1x = prev.x + (current.x - prev.x) * 0.5;
+                const cp1y = prev.y + (current.y - prev.y) * 0.5;
+                const cp2x = current.x - (next.x - current.x) * 0.5;
+                const cp2y = current.y - (next.y - current.y) * 0.5;
+                
+                ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, current.x, current.y);
             }
+            
+            // Close the curve with final bezier
+            const last = points[points.length-1];
+            const first = points[0];
+            const second = points[1];
+            
+            const cp1x = last.x + (first.x - last.x) * 0.5;
+            const cp1y = last.y + (first.y - last.y) * 0.5;
+            const cp2x = first.x - (second.x - first.x) * 0.5;
+            const cp2y = first.y - (second.y - first.y) * 0.5;
+            
+            ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, first.x, first.y);
             
             ctx.closePath();
             ctx.fill();
             
-            // Add highlight
+            // Add highlight with same alpha
             ctx.fillStyle = `rgba(164, 194, 244, ${alpha * 0.3})`;
             ctx.fill();
         }
         
         ctx.restore();
+    }
+    
+    // Add more control points between existing points for smoother curves
+    addControlPoints(points) {
+        if (points.length <= 2) return points;
+        
+        const result = [];
+        
+        for (let i = 0; i < points.length; i++) {
+            const current = points[i];
+            result.push(current);
+            
+            // Add midpoint to next vertex with some randomization
+            const next = points[(i + 1) % points.length];
+            const midX = (current.x + next.x) / 2 + (Math.random() - 0.5) * 5;
+            const midY = (current.y + next.y) / 2 + (Math.random() - 0.5) * 5;
+            
+            result.push({ x: midX, y: midY });
+        }
+        
+        return result;
     }
     
     // Compute convex hull using Graham scan
@@ -245,7 +292,7 @@ export class WaterSystem {
         centerY /= points.length;
         
         // Add time-based wobble factor
-        const wobbleFactor = Math.sin(Date.now() / 200) * 0.2 + 1.0;
+        const wobbleFactor = Math.sin(Date.now() / 200) * 0.3 + 1.2; // Increased wobble
         
         // Expand points outward from center with wobble
         return points.map((p, i) => {
@@ -261,10 +308,10 @@ export class WaterSystem {
             const ny = dy / distance;
             
             // Individual point wobble - varies by position and time
-            const individualWobble = Math.sin((Date.now() / 300) + i * 0.7) * 2 + 1.0;
+            const individualWobble = Math.sin((Date.now() / 300) + i * 0.7) * 3 + 2.0; // Increased wobble
             
-            // Expansion factor - base expansion (2) plus wobble
-            const expansionFactor = 2 + wobbleFactor * individualWobble;
+            // Expansion factor - base expansion (3) plus wobble
+            const expansionFactor = 3 + wobbleFactor * individualWobble;
             
             // Return expanded point
             return {
