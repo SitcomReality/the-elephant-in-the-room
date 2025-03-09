@@ -6,7 +6,7 @@ import { Human } from './human.js';
 import { renderSpeechBubble, renderScoreMultiplier } from './ui.js';
 import { circleRectangleCollision, lineIntersectsRect } from './physics.js';
 import { upgrades, levelUpQuotes } from './progression.js';
-import { sprites, getFurnitureSprites, getPickupSprites } from './sprites.js';
+import { sprites, getFurnitureSprites, getPickupSprites, spritesheet } from './sprites.js';
 
 // Game canvas and context
 const canvas = document.getElementById('gameCanvas');
