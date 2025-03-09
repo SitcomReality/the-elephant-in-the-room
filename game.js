@@ -249,6 +249,18 @@ function createPauseOverlay() {
             <div class="pause-content">
                 <h2>Game Paused</h2>
                 <p>Press P, ESC, or Pause/Break to resume</p>
+                <div class="instructions">
+                    <h3>How to Play</h3>
+                    <ul>
+                        <li>Use WASD or Arrow Keys to move the elephant</li>
+                        <li>Move your mouse to aim the trunk</li>
+                        <li>Click to swing your trunk and fling objects</li>
+                        <li>Hit humans with objects to increase your score multiplier</li>
+                        <li>Collect power-ups for temporary boosts</li>
+                        <li>Don't let humans see you!</li>
+                        <li>Level up to gain permanent upgrades</li>
+                    </ul>
+                </div>
             </div>
         `;
         document.getElementById('game-container').appendChild(pauseOverlay);
@@ -267,9 +279,29 @@ function togglePause() {
     // Toggle visibility
     pauseOverlay.style.display = gamePaused ? 'flex' : 'none';
     
+    // Update pause button icon
+    updatePauseButtonIcon();
+    
     // Reset time tracking when unpausing to prevent time jump
     if (!gamePaused) {
         lastUpdateTime = Date.now();
+    }
+}
+
+// Update the pause button icon based on game state
+function updatePauseButtonIcon() {
+    const pauseButton = document.getElementById('pause-button');
+    if (!pauseButton) return;
+    
+    if (document.getElementById('splash-screen').style.display !== 'none' || 
+        !document.getElementById('game-over').classList.contains('hidden')) {
+        // Show info icon when on splash screen or game over
+        pauseButton.innerHTML = 'ℹ️';
+        pauseButton.setAttribute('aria-label', 'Game information');
+    } else {
+        // Show play/pause based on current state
+        pauseButton.innerHTML = gamePaused ? '▶️' : '⏸️';
+        pauseButton.setAttribute('aria-label', gamePaused ? 'Resume game' : 'Pause game');
     }
 }
 
@@ -323,6 +355,9 @@ function resetGame() {
     if (pauseOverlay) {
         pauseOverlay.style.display = 'none';
     }
+    
+    // Update pause button icon
+    updatePauseButtonIcon();
 }
 
 function spawnHuman() {
@@ -1046,6 +1081,9 @@ document.getElementById('start-btn').addEventListener('click', () => {
     document.getElementById('splash-screen').style.display = 'none';
     gameActive = true;
     resetGame();
+    
+    // Update pause button icon after starting game
+    updatePauseButtonIcon();
 });
 
 // Handle window resize
@@ -1063,6 +1101,9 @@ function endGame() {
     gameOver = true;
     document.getElementById('final-score').textContent = score;
     document.getElementById('game-over').classList.remove('hidden');
+    
+    // Update pause button icon
+    updatePauseButtonIcon();
 }
 
 // Export game state for other modules
@@ -1083,3 +1124,32 @@ window.gameState = {
     ctx,
     roomObjects
 };
+
+document.addEventListener('DOMContentLoaded', () => {
+    // Set up pause button
+    const pauseButton = document.getElementById('pause-button');
+    pauseButton.addEventListener('click', () => {
+        // If on splash screen or game over, show pause overlay with instructions
+        if (document.getElementById('splash-screen').style.display !== 'none' || 
+            !document.getElementById('game-over').classList.contains('hidden')) {
+            
+            // Create and show pause overlay with instructions only
+            if (!pauseOverlay) {
+                createPauseOverlay();
+            }
+            pauseOverlay.style.display = 'flex';
+            
+            // Custom title for info mode
+            const pauseTitle = pauseOverlay.querySelector('h2');
+            if (pauseTitle) {
+                pauseTitle.textContent = 'Game Information';
+            }
+        } else {
+            // Normal pause/unpause
+            togglePause();
+        }
+    });
+    
+    // Initial button state
+    updatePauseButtonIcon();
+});
