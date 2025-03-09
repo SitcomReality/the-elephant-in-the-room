@@ -1,16 +1,39 @@
 // Collision detection utilities
 
-export function circleRectangleCollision(circleX, circleY, circleRadius, rectX, rectY, rectWidth, rectHeight) {
-    // Find closest point on rectangle to circle
-    const closestX = Math.max(rectX, Math.min(circleX, rectX + rectWidth));
-    const closestY = Math.max(rectY, Math.min(circleY, rectY + rectHeight));
-    
-    // Calculate distance between closest point and circle center
-    const distanceX = circleX - closestX;
-    const distanceY = circleY - closestY;
-    const distanceSquared = distanceX * distanceX + distanceY * distanceY;
-    
-    return distanceSquared < (circleRadius * circleRadius);
+export function circleRectangleCollision(circleX, circleY, circleRadius, rectX, rectY, rectWidth, rectHeight, rectAngle = 0) {
+    if (rectAngle === 0) {
+        // Use existing collision for non-rotated rectangles
+        const closestX = Math.max(rectX, Math.min(circleX, rectX + rectWidth));
+        const closestY = Math.max(rectY, Math.min(circleY, rectY + rectHeight));
+        
+        const distanceX = circleX - closestX;
+        const distanceY = circleY - closestY;
+        const distanceSquared = distanceX * distanceX + distanceY * distanceY;
+        
+        return distanceSquared < (circleRadius * circleRadius);
+    } else {
+        // For rotated rectangles, transform the circle into the rectangle's local space
+        const centerRectX = rectX + rectWidth / 2;
+        const centerRectY = rectY + rectHeight / 2;
+        
+        // Translate circle to rectangle's local coordinates
+        const translatedX = circleX - centerRectX;
+        const translatedY = circleY - centerRectY;
+        
+        // Rotate circle to align with rectangle
+        const rotatedX = translatedX * Math.cos(-rectAngle) - translatedY * Math.sin(-rectAngle);
+        const rotatedY = translatedX * Math.sin(-rectAngle) + translatedY * Math.cos(-rectAngle);
+        
+        // Add back the offset to get the rotated position
+        const localCircleX = rotatedX + centerRectX;
+        const localCircleY = rotatedY + centerRectY;
+        
+        // Now use the regular AABB-circle collision
+        return circleRectangleCollision(
+            localCircleX, localCircleY, circleRadius,
+            rectX, rectY, rectWidth, rectHeight, 0
+        );
+    }
 }
 
 export function lineIntersectsRect(x1, y1, x2, y2, rx, ry, rw, rh) {

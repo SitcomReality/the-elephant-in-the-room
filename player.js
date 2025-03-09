@@ -282,6 +282,10 @@ export class Player {
                     obj.vx += dirX * forceFactor;
                     obj.vy += dirY * forceFactor;
                 }
+                
+                // Add some rotation
+                const torque = (Math.random() - 0.5) * this.yeetStrength / (obj.mass || 1);
+                obj.angularVelocity += torque;
             }
         });
     }
@@ -324,6 +328,19 @@ export class Player {
                             obj.vx += forceX * appliedForce;
                             obj.vy += forceY * appliedForce;
                         }
+                    }
+                    
+                    // Add some rotation to the object based on the direction of the trunk hit
+                    if (nodeSpeed > 1.0) {
+                        // Calculate torque direction based on hit location relative to center
+                        const hitOffsetX = node.x - (obj.x + obj.width / 2);
+                        const hitOffsetY = node.y - (obj.y + obj.height / 2);
+                        
+                        // Cross product to determine rotation direction
+                        const torqueDirection = forceX * hitOffsetY - forceY * hitOffsetX;
+                        
+                        // Apply angular velocity based on hit strength and object's mass
+                        obj.angularVelocity += torqueDirection * 0.001 * appliedForce / obj.mass;
                     }
                     
                     // Make the trunk node bounce off the object slightly
