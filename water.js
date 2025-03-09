@@ -35,22 +35,35 @@ export class WaterSystem {
         this.particles = [];
         this.maxParticles = 10; // Default max particles
         this.lastEmissionTime = 0;
-        this.emissionCooldown = 250; // 250ms between emissions
+        this.emissionCooldown = 150; // Changed from 250ms to 150ms between emissions
         this.waterColor = '#5A9BD5'; // Base water color
         this.particleLifetime = 3000; // 3 seconds
+        this.requiredFreeSlots = 3; // Minimum number of free slots required to emit
+        this.minEmissionCount = 3; // Minimum number of particles to emit per click
+        this.emissionsRemaining = 0; // Counter for remaining emissions in burst
+        this.emissionDirection = { x: 0, y: 0 }; // Store direction for consistent bursts
     }
     
     canEmit() {
-        return this.particles.length < this.maxParticles && 
-               Date.now() - this.lastEmissionTime > this.emissionCooldown;
+        return (this.particles.length <= this.maxParticles - this.requiredFreeSlots) && 
+               (Date.now() - this.lastEmissionTime > this.emissionCooldown);
     }
     
     emit(x, y, directionX, directionY, speed) {
         if (!this.canEmit()) return;
         
+        // If this is the start of a new burst, store direction and set counter
+        if (this.emissionsRemaining <= 0) {
+            this.emissionsRemaining = this.minEmissionCount;
+            this.emissionDirection = { 
+                x: directionX, 
+                y: directionY 
+            };
+        }
+        
         // Add small random variation to direction
         const angleVariation = (Math.random() - 0.5) * 0.5; // +/- 0.25 radians
-        const angle = Math.atan2(directionY, directionX) + angleVariation;
+        const angle = Math.atan2(this.emissionDirection.y, this.emissionDirection.x) + angleVariation;
         
         // Calculate new direction with variation
         const adjustedSpeed = speed * (0.8 + Math.random() * 0.4); // 80-120% of base speed
@@ -64,6 +77,9 @@ export class WaterSystem {
         
         // Update emission time
         this.lastEmissionTime = Date.now();
+        
+        // Decrement remaining emissions
+        this.emissionsRemaining--;
     }
     
     update() {

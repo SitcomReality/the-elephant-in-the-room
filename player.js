@@ -167,7 +167,7 @@ export class Player {
         this.waterSystem.update();
         
         // Handle water spray - check if mouse is down and emit water particles
-        if (mouse.down && this.waterSystem.canEmit()) {
+        if (mouse.down) {
             // Get last trunk node as emission point
             const lastNode = this.trunkNodes[this.trunkNodes.length - 1];
             
@@ -176,7 +176,7 @@ export class Player {
             const dirY = mouse.y - lastNode.y;
             const dist = Math.sqrt(dirX * dirX + dirY * dirY);
             
-            if (dist > 0) {
+            if (dist > 0 && this.waterSystem.canEmit()) {
                 // Emit water in the direction of the mouse
                 const normalizedDirX = dirX / dist;
                 const normalizedDirY = dirY / dist;
@@ -189,6 +189,9 @@ export class Player {
                     5 // Base speed for water particles
                 );
             }
+        } else {
+            // Reset emissions counter when mouse button is released
+            this.waterSystem.emissionsRemaining = 0;
         }
     }
     
