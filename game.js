@@ -272,11 +272,14 @@ function togglePause() {
         
         // Reset time tracking when unpausing to prevent time jump
         if (!gamePaused) {
-            lastUpdateTime = Date.now();
-            secondaryPickupTimer = Date.now() + secondaryPickupInterval;
-            lastHumanSpawnTime = Date.now();
-            lastPickupSpawnTime = Date.now();
-            lastMultiplierIncreaseTime = Date.now();
+            const currentTime = Date.now();
+            const elapsedPauseTime = currentTime - lastUpdateTime;
+            gameStartTime += elapsedPauseTime; // Adjust game start time to account for pause duration
+            lastUpdateTime = currentTime;
+            secondaryPickupTimer += elapsedPauseTime;
+            lastHumanSpawnTime += elapsedPauseTime;
+            lastPickupSpawnTime += elapsedPauseTime;
+            lastMultiplierIncreaseTime += elapsedPauseTime;
         }
     }
     
