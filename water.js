@@ -159,7 +159,12 @@ export class WaterSystem {
             particles[0]
         );
         
-        const alpha = oldestParticle.getRemainingLifetimePercent();
+        // Modified alpha calculation: maintain 100% opacity until final second
+        let alpha = 1.0;
+        const remainingLifetime = oldestParticle.lifetime - (Date.now() - oldestParticle.creationTime);
+        if (remainingLifetime < 1000) {
+            alpha = remainingLifetime / 1000; // Linear fade over the final second
+        }
         
         // Draw the water blob
         ctx.save();
