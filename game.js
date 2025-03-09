@@ -368,7 +368,7 @@ function updateHumans() {
     
     humans.forEach(human => {
         // Update human
-        human.update(currentTime, player, room seminarObjects, humans, canvas.width, canvas.height, doors);
+        human.update(currentTime, player, roomObjects, humans, canvas.width, canvas.height, doors);
         
         // Check if human can see the player
         if (isPlayerInVision(human)) {
