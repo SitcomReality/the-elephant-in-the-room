@@ -130,29 +130,26 @@ export class WaterSystem {
         // Start with base points from particles
         let points = particles.map(p => ({ x: p.x, y: p.y }));
         
-        // For single particles, create a small circle shape
+        // For single particles, create a simple circle instead of a complex shape
         if (points.length === 1) {
             const p = points[0];
-            const radius = 5;
-            points = [];
-            
-            // Create a small puddle with more points (was 6, now 12)
-            for (let i = 0; i < 12; i++) {
-                const angle = (i / 12) * Math.PI * 2;
-                // Add some randomness to radius
-                const randRadius = radius * (0.7 + Math.random() * 0.6);
-                points.push({
-                    x: p.x + Math.cos(angle) * randRadius,
-                    y: p.y + Math.sin(angle) * randRadius
-                });
-            }
-            
             // For single particles, get alpha based on lifetime
             const remainingLifetime = particles[0].lifetime - (Date.now() - particles[0].creationTime);
             const alpha = remainingLifetime < 1000 ? (remainingLifetime / 1000) : 1.0;
             
-            // Draw the single particle with fading
-            this.drawWaterShape(ctx, points, alpha);
+            // Draw simple circle for single particles
+            ctx.save();
+            ctx.fillStyle = `rgba(90, 155, 213, ${alpha * 0.7})`;
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, 6, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Add simple highlight
+            ctx.fillStyle = `rgba(164, 194, 244, ${alpha * 0.3})`;
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, 4, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
         } else {
             // For multi-particle blobs, compute smoother shape with Bezier curves
             points = this.computeConvexHull(points);
