@@ -1,5 +1,6 @@
 // Import physics utilities
 import { circleRectangleCollision } from './physics.js';
+import { WaterSystem } from './water.js';
 
 // Trunk node class for the multi-node trunk system
 class TrunkNode {
@@ -47,6 +48,10 @@ export class Player {
         
         // Add property for yeeting objects on click
         this.yeetStrength = 10;
+        
+        // Add water system
+        this.waterSystem = new WaterSystem();
+        this.isSprayingWater = false;
         
         // Initialize trunk nodes
         this.initTrunk();
@@ -157,6 +162,64 @@ export class Player {
         
         // Update trunk nodes
         this.updateTrunk(mouse, roomObjects);
+        
+        // Update water particles
+        this.waterSystem.update();
+        
+        // Handle water spray - check if mouse is down and emit water particles
+        if (mouse.down && this.waterSystem.canEmit()) {
+            // Get last trunk node as emission point
+            const lastNode = this.trunkNodes[this.trunkNodes.length - 1];
+            
+            // Calculate direction from last node to mouse
+            const dirX = mouse.x - lastNode.x;
+            const dirY = mouse.y - lastNode.y;
+            const dist = Math.sqrt(dirX * dirX + dirY * dirY);
+            
+            if (dist > 0) {
+                // Emit water in the direction of the mouse
+                const normalizedDirX = dirX / dist;
+                const normalizedDirY = dirY / dist;
+                
+                this.waterSystem.emit(
+                    lastNode.x, 
+                    lastNode.y, 
+                    normalizedDirX, 
+                    normalizedDirY, 
+                    5 // Base speed for water particles
+                );
+            }
+        }
+    }
+    
+    yeetObjectsInContact(roomObjects, mouse) {
+        // Find objects that are in contact with the elephant
+        roomObjects.forEach(obj => {
+            if (circleRectangleCollision(
+                this.x, this.y, this.radius,
+                obj.x, obj.y, obj.width, obj.height
+            )) {
+                // Calculate direction from elephant to mouse
+                const dx = mouse.x - this.x;
+                const dy = mouse.y - this.y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                
+                if (dist > 0) {
+                    // Normalize and apply force
+                    const dirX = dx / dist;
+                    const dirY = dy / dist;
+                    
+                    // Apply force based on object mass
+                    const forceFactor = this.yeetStrength / (obj.mass || 1);
+                    obj.vx += dirX * forceFactor;
+                    obj.vy += dirY * forceFactor;
+                }
+                
+                // Add some rotation
+                const torque = (Math.random() - 0.5) * this.yeetStrength / (obj.mass || 1);
+                obj.angularVelocity += torque;
+            }
+        });
     }
     
     updateTrunk(mouse, roomObjects) {
@@ -258,36 +321,6 @@ export class Player {
         
         // Always check for collisions between all trunk nodes and room objects
         this.checkTrunkCollisions(roomObjects);
-    }
-    
-    yeetObjectsInContact(roomObjects, mouse) {
-        // Find objects that are in contact with the elephant
-        roomObjects.forEach(obj => {
-            if (circleRectangleCollision(
-                this.x, this.y, this.radius,
-                obj.x, obj.y, obj.width, obj.height
-            )) {
-                // Calculate direction from elephant to mouse
-                const dx = mouse.x - this.x;
-                const dy = mouse.y - this.y;
-                const dist = Math.sqrt(dx * dx + dy * dy);
-                
-                if (dist > 0) {
-                    // Normalize and apply force
-                    const dirX = dx / dist;
-                    const dirY = dy / dist;
-                    
-                    // Apply force based on object mass
-                    const forceFactor = this.yeetStrength / (obj.mass || 1);
-                    obj.vx += dirX * forceFactor;
-                    obj.vy += dirY * forceFactor;
-                }
-                
-                // Add some rotation
-                const torque = (Math.random() - 0.5) * this.yeetStrength / (obj.mass || 1);
-                obj.angularVelocity += torque;
-            }
-        });
     }
     
     checkTrunkCollisions(roomObjects) {
@@ -465,5 +498,8 @@ export class Player {
             ctx.fill();
         }
         */
+        
+        // Render water particles AFTER the elephant is drawn
+        this.waterSystem.render(ctx);
     }
 }

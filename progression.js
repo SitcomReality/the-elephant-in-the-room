@@ -27,6 +27,20 @@ export const upgrades = [
         description: 'Pickups appear 1 second more frequently.',
         icon: '🍀',
         oneTime: false
+    },
+    {
+        id: 'water_capacity',
+        title: 'Bigger Reservoir',
+        description: 'Increase max water capacity by 1.',
+        icon: '💧',
+        oneTime: false
+    },
+    {
+        id: 'water_duration',
+        title: 'Slow Evaporation',
+        description: 'Water lasts 500ms longer before evaporating.',
+        icon: '☁️',
+        oneTime: false
     }
 ];
 

@@ -230,7 +230,6 @@ window.addEventListener('mousedown', (e) => {
         });
     } else {
         mouse.down = true;
-        player.startTrunkSwing();
     }
 });
 
@@ -782,6 +781,12 @@ function applyUpgrade(upgrade) {
             break;
         case 'pickup_frequency':
             pickupSpawnInterval = Math.max(3000, pickupSpawnInterval - 1000); // Min 3 seconds
+            break;
+        case 'water_capacity':
+            player.waterSystem.increaseMaxParticles();
+            break;
+        case 'water_duration':
+            player.waterSystem.increaseLifetime();
             break;
     }
 }
