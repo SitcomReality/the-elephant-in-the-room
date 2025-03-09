@@ -119,14 +119,14 @@ export class Player {
             roomObjects.forEach(obj => {
                 if (circleRectangleCollision(
                     newX, this.y, this.radius,
-                    obj.x, obj.y, obj.width, obj.height, obj.angle
+                    obj.x, obj.y, obj.width, obj.height
                 )) {
                     canMoveX = false;
                 }
                 
                 if (circleRectangleCollision(
                     this.x, newY, this.radius,
-                    obj.x, obj.y, obj.width, obj.height, obj.angle
+                    obj.x, obj.y, obj.width, obj.height
                 )) {
                     canMoveY = false;
                 }
@@ -265,7 +265,7 @@ export class Player {
         roomObjects.forEach(obj => {
             if (circleRectangleCollision(
                 this.x, this.y, this.radius,
-                obj.x, obj.y, obj.width, obj.height, obj.angle
+                obj.x, obj.y, obj.width, obj.height
             )) {
                 // Calculate direction from elephant to mouse
                 const dx = mouse.x - this.x;
@@ -283,8 +283,8 @@ export class Player {
                     obj.vy += dirY * forceFactor;
                 }
                 
-                // Add some rotation - reduce this value for stiffer rotation
-                const torque = (Math.random() - 0.5) * this.yeetStrength / (obj.mass || 1) * 0.5; // Reduced by half with *0.5
+                // Add some rotation
+                const torque = (Math.random() - 0.5) * this.yeetStrength / (obj.mass || 1);
                 obj.angularVelocity += torque;
             }
         });
@@ -305,19 +305,19 @@ export class Player {
                 // Check if node is colliding with object
                 if (circleRectangleCollision(
                     node.x, node.y, node.radius,
-                    obj.x, obj.y, obj.width, obj.height, obj.angle
+                    obj.x, obj.y, obj.width, obj.height
                 )) {
                     // Whether swinging or not, apply force if the trunk is moving fast enough
                     if (nodeSpeed > 1.0) {
                         // Calculate force direction (from previous node to this node)
-                        const forceX = node.x - prevNode.x;
-                        const forceY = node.y - prevNode.y;
+                        let forceX = node.x - prevNode.x;
+                        let forceY = node.y - prevNode.y;
                         
                         // Normalize
                         const forceMag = Math.sqrt(forceX * forceX + forceY * forceY);
                         if (forceMag > 0) {
-                            const normalizedForceX = forceX / forceMag;
-                            const normalizedForceY = forceY / forceMag;
+                            forceX /= forceMag;
+                            forceY /= forceMag;
                             
                             // Apply force based on object mass and node speed
                             const forceFactor = nodeSpeed / (obj.mass || 1);
@@ -325,8 +325,8 @@ export class Player {
                             const maxForce = this.trunkSwinging ? 15 : 5;
                             const appliedForce = Math.min(forceFactor, maxForce);
                             
-                            obj.vx += normalizedForceX * appliedForce;
-                            obj.vy += normalizedForceY * appliedForce;
+                            obj.vx += forceX * appliedForce;
+                            obj.vy += forceY * appliedForce;
                         }
                         
                         // Add some rotation to the object based on the direction of the trunk hit
@@ -336,11 +336,10 @@ export class Player {
                             const hitOffsetY = node.y - (obj.y + obj.height / 2);
                             
                             // Cross product to determine rotation direction
-                            const torqueDirection = normalizedForceX * hitOffsetY - normalizedForceY * hitOffsetX;
+                            const torqueDirection = forceX * hitOffsetY - forceY * hitOffsetX;
                             
                             // Apply angular velocity based on hit strength and object's mass
-                            // Reduce the rotation factor to make it stiffer
-                            obj.angularVelocity += torqueDirection * 0.0005 * nodeSpeed / obj.mass; // Reduced from 0.001 to 0.0005
+                            obj.angularVelocity += torqueDirection * 0.001 * nodeSpeed / obj.mass;
                         }
                     }
                     

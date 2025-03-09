@@ -4,7 +4,13 @@ import { Player } from './player.js';
 import { RoomObject } from './objects.js';
 import { Human } from './human.js';
 import { renderSpeechBubble, renderScoreMultiplier } from './ui.js';
-import { circleRectangleCollision, lineIntersectsRect } from './physics.js';
+import { 
+    circleRectangleCollision, 
+    lineIntersectsRect,
+    updateFurniturePhysics,
+    handleFurnitureCollisions,
+    lineIntersectsRotatedRect
+} from './physics.js';
 import { upgrades, levelUpQuotes } from './progression.js';
 import { sprites, getFurnitureSprites, getPickupSprites, spritesheet } from './sprites.js';
 
@@ -425,21 +431,10 @@ function rectsIntersect(rect1, rect2) {
 function updateObjects() {
     const currentTime = Date.now();
     
+    // Use the physics module to update furniture
+    updateFurniturePhysics(roomObjects, canvas.width, canvas.height);
+    
     roomObjects.forEach(obj => {
-        obj.update(canvas.width, canvas.height);
-        
-        // Check for collisions with other objects
-        for (let i = 0; i < roomObjects.length; i++) {
-            const otherObj = roomObjects[i];
-            // Skip self
-            if (obj === otherObj) continue;
-            
-            // Check collision between objects
-            if (obj.collidesWith(otherObj)) {
-                obj.handleCollision(otherObj);
-            }
-        }
-        
         // Check for collision with humans if the object is moving
         if (Math.abs(obj.vx) > 0.5 || Math.abs(obj.vy) > 0.5 || Math.abs(obj.angularVelocity) > 0.05) {
             humans.forEach(human => {
@@ -617,8 +612,8 @@ function isPlayerInVision(human) {
 function isLineOfSightBlocked(x1, y1, x2, y2) {
     // Check each object to see if it blocks the line of sight
     for (const obj of roomObjects) {
-        // Check intersection with the object
-        if (lineIntersectsRect(x1, y1, x2, y2, obj.x, obj.y, obj.width, obj.height)) {
+        // Use the new function that handles rotated rectangles
+        if (lineIntersectsRotatedRect(x1, y1, x2, y2, obj)) {
             return true;
         }
     }
@@ -1230,97 +1225,3 @@ document.addEventListener('DOMContentLoaded', () => {
     // Initial button state
     updatePauseButtonIcon();
 });
-
-function updateObjects() {
-    const currentTime = Date.now();
-    
-    roomObjects.forEach(obj => {
-        obj.update(canvas.width, canvas.height);
-        
-        // Check for collisions with other objects
-        for (let i = 0; i < roomObjects.length; i++) {
-            const otherObj = roomObjects[i];
-            // Skip self
-            if (obj === otherObj) continue;
-            
-            // Check collision between objects
-            if (obj.collidesWith(otherObj)) {
-                obj.handleCollision(otherObj);
-            }
-        }
-        
-        // Check for collision with humans if the object is moving
-        if (Math.abs(obj.vx) > 0.5 || Math.abs(obj.vy) > 0.5 || Math.abs(obj.angularVelocity) > 0.05) {
-            humans.forEach(human => {
-                if (obj.angle !== 0) {
-                    // Use the rotated corners for collision check
-                    const objCorners = obj.getCorners();
-                    let collision = false;
-                    
-                    // Approximate circle-polygon collision
-                    for (let i = 0; i < objCorners.length; i++) {
-                        const j = (i + 1) % objCorners.length;
-                        
-                        // Check if human is close to any edge of the object
-                        const edge = {
-                            x1: objCorners[i].x,
-                            y1: objCorners[i].y,
-                            x2: objCorners[j].x,
-                            y2: objCorners[j].y
-                        };
-                        
-                        const dist = pointToLineDistance(human.x, human.y, edge.x1, edge.y1, edge.x2, edge.y2);
-                        if (dist < human.radius) {
-                            collision = true;
-                            break;
-                        }
-                    }
-                    
-                    if (collision) {
-                        // Make the object bounce off the human
-                        obj.vx = -obj.vx * 0.8;
-                        obj.vy = -obj.vy * 0.8;
-                        obj.angularVelocity = -obj.angularVelocity * 0.8;
-                        
-                        // Make human show speech bubble if enough time has passed
-                        if (currentTime - human.lastSpeechTime > 5000) {
-                            human.speak(getRandomDialogue(objectHitDialogue), currentTime);
-                            
-                            // Increase score multiplier if object was moving fast enough
-                            const objSpeed = Math.sqrt(obj.vx * obj.vx + obj.vy * obj.vy);
-                            if ((objSpeed > 1.0 || Math.abs(obj.angularVelocity) > 0.2) && 
-                                currentTime - human.lastHitTime > 1000) {
-                                increaseMultiplier(currentTime);
-                                human.lastHitTime = currentTime; // Prevent multiple increases from same hit
-                            }
-                        }
-                    }
-                } else {
-                    // Use the original circle-rectangle collision for non-rotated objects
-                    if (circleRectangleCollision(
-                        human.x, human.y, human.radius,
-                        obj.x, obj.y, obj.width, obj.height
-                    )) {
-                        // Make the object bounce off the human
-                        obj.vx = -obj.vx * 0.8;
-                        obj.vy = -obj.vy * 0.8;
-                        obj.angularVelocity = -obj.angularVelocity * 0.8;
-                        
-                        // Make human show speech bubble if enough time has passed
-                        if (currentTime - human.lastSpeechTime > 5000) {
-                            human.speak(getRandomDialogue(objectHitDialogue), currentTime);
-                            
-                            // Increase score multiplier if object was moving fast enough
-                            const objSpeed = Math.sqrt(obj.vx * obj.vx + obj.vy * obj.vy);
-                            if ((objSpeed > 1.0 || Math.abs(obj.angularVelocity) > 0.2) && 
-                                currentTime - human.lastHitTime > 1000) {
-                                increaseMultiplier(currentTime);
-                                human.lastHitTime = currentTime; // Prevent multiple increases from same hit
-                            }
-                        }
-                    }
-                }
-            });
-        }
-    });
-}

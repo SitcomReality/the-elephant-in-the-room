@@ -17,8 +17,7 @@ export class RoomObject {
         // Add rotation properties
         this.angle = 0;
         this.angularVelocity = 0;
-        // Increase rotational inertia for stiffer rotation
-        this.rotationInertia = mass * (width * width + height * height) / 6; // Increased from /12 to /6
+        this.rotationInertia = mass * (width * width + height * height) / 12; // Moment of inertia for rectangle
     }
     
     resetVelocity() {
@@ -31,40 +30,8 @@ export class RoomObject {
     }
     
     update(canvasWidth, canvasHeight) {
-        // Update position
-        this.x += this.vx;
-        this.y += this.vy;
-        
-        // Update rotation
-        this.angle += this.angularVelocity;
-        
-        // Apply friction
-        this.vx *= 0.95;
-        this.vy *= 0.95;
-        // Increase angular velocity damping for stiffer rotation
-        this.angularVelocity *= 0.9; // Increased from 0.95 to 0.9
-        
-        // Reset velocity if it's very small
-        if (Math.abs(this.vx) < 0.1) this.vx = 0;
-        if (Math.abs(this.vy) < 0.1) this.vy = 0;
-        if (Math.abs(this.angularVelocity) < 0.01) this.angularVelocity = 0;
-        
-        // Bounce off walls
-        if (this.x < 0) {
-            this.x = 0;
-            this.vx = -this.vx * 0.5;
-        } else if (this.x + this.width > canvasWidth) {
-            this.x = canvasWidth - this.width;
-            this.vx = -this.vx * 0.5;
-        }
-        
-        if (this.y < 0) {
-            this.y = 0;
-            this.vy = -this.vy * 0.5;
-        } else if (this.y + this.height > canvasHeight) {
-            this.y = canvasHeight - this.height;
-            this.vy = -this.vy * 0.5;
-        }
+        // This method now delegated to physics.js
+        // Function remains as a stub for backward compatibility
     }
     
     render(ctx) {

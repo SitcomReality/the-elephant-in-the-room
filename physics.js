@@ -1,60 +1,7 @@
 // Collision detection utilities
 
 export function circleRectangleCollision(circleX, circleY, circleRadius, rectX, rectY, rectWidth, rectHeight, rectAngle = 0) {
-    // For rotated rectangles, use corner-based detection
-    if (rectAngle !== 0) {
-        // Get the corners of the rotated rectangle
-        const centerRectX = rectX + rectWidth / 2;
-        const centerRectY = rectY + rectHeight / 2;
-        
-        const corners = [
-            // Top-left
-            {
-                x: centerRectX + (-rectWidth/2 * Math.cos(rectAngle) - -rectHeight/2 * Math.sin(rectAngle)),
-                y: centerRectY + (-rectWidth/2 * Math.sin(rectAngle) + -rectHeight/2 * Math.cos(rectAngle))
-            },
-            // Top-right
-            {
-                x: centerRectX + (rectWidth/2 * Math.cos(rectAngle) - -rectHeight/2 * Math.sin(rectAngle)),
-                y: centerRectY + (rectWidth/2 * Math.sin(rectAngle) + -rectHeight/2 * Math.cos(rectAngle))
-            },
-            // Bottom-right
-            {
-                x: centerRectX + (rectWidth/2 * Math.cos(rectAngle) - rectHeight/2 * Math.sin(rectAngle)),
-                y: centerRectY + (rectWidth/2 * Math.sin(rectAngle) + rectHeight/2 * Math.cos(rectAngle))
-            },
-            // Bottom-left
-            {
-                x: centerRectX + (-rectWidth/2 * Math.cos(rectAngle) - rectHeight/2 * Math.sin(rectAngle)),
-                y: centerRectY + (-rectWidth/2 * Math.sin(rectAngle) + rectHeight/2 * Math.cos(rectAngle))
-            }
-        ];
-        
-        // Check if circle is inside the polygon using ray casting
-        let inside = false;
-        
-        // First, check if the circle center is inside the polygon
-        for (let i = 0, j = corners.length - 1; i < corners.length; j = i++) {
-            if (((corners[i].y > circleY) !== (corners[j].y > circleY)) &&
-                (circleX < (corners[j].x - corners[i].x) * (circleY - corners[i].y) / (corners[j].y - corners[i].y) + corners[i].x)) {
-                inside = !inside;
-            }
-        }
-        
-        // If inside, collision is true
-        if (inside) return true;
-        
-        // If not inside, check distance to each edge
-        for (let i = 0; i < corners.length; i++) {
-            const j = (i + 1) % corners.length;
-            const dist = pointToLineDistance(circleX, circleY, corners[i].x, corners[i].y, corners[j].x, corners[j].y);
-            if (dist < circleRadius) {
-                return true;
-            }
-        }
-        
-        return false;
-    } else {
+    if (rectAngle === 0) {
         // Use existing collision for non-rotated rectangles
         const closestX = Math.max(rectX, Math.min(circleX, rectX + rectWidth));
         const closestY = Math.max(rectY, Math.min(circleY, rectY + rectHeight));
@@ -64,41 +11,29 @@ export function circleRectangleCollision(circleX, circleY, circleRadius, rectX, 
         const distanceSquared = distanceX * distanceX + distanceY * distanceY;
         
         return distanceSquared < (circleRadius * circleRadius);
-    }
-}
-
-// Helper function for point-to-line distance
-function pointToLineDistance(px, py, x1, y1, x2, y2) {
-    const A = px - x1;
-    const B = py - y1;
-    const C = x2 - x1;
-    const D = y2 - y1;
-
-    const dot = A * C + B * D;
-    const len_sq = C * C + D * D;
-    let param = -1;
-    
-    if (len_sq !== 0) {
-        param = dot / len_sq;
-    }
-
-    let xx, yy;
-
-    if (param < 0) {
-        xx = x1;
-        yy = y1;
-    } else if (param > 1) {
-        xx = x2;
-        yy = y2;
     } else {
-        xx = x1 + param * C;
-        yy = y1 + param * D;
+        // For rotated rectangles, transform the circle into the rectangle's local space
+        const centerRectX = rectX + rectWidth / 2;
+        const centerRectY = rectY + rectHeight / 2;
+        
+        // Translate circle to rectangle's local coordinates
+        const translatedX = circleX - centerRectX;
+        const translatedY = circleY - centerRectY;
+        
+        // Rotate circle to align with rectangle
+        const rotatedX = translatedX * Math.cos(-rectAngle) - translatedY * Math.sin(-rectAngle);
+        const rotatedY = translatedX * Math.sin(-rectAngle) + translatedY * Math.cos(-rectAngle);
+        
+        // Add back the offset to get the rotated position
+        const localCircleX = rotatedX + centerRectX;
+        const localCircleY = rotatedY + centerRectY;
+        
+        // Now use the regular AABB-circle collision
+        return circleRectangleCollision(
+            localCircleX, localCircleY, circleRadius,
+            rectX, rectY, rectWidth, rectHeight, 0
+        );
     }
-
-    const dx = px - xx;
-    const dy = py - yy;
-    
-    return Math.sqrt(dx * dx + dy * dy);
 }
 
 export function lineIntersectsRect(x1, y1, x2, y2, rx, ry, rw, rh) {
@@ -120,6 +55,24 @@ export function lineIntersectsLine(x1, y1, x2, y2, x3, y3, x4, y4) {
     return (uA >= 0 && uA <= 1 && uB >= 0 && uB <= 1);
 }
 
+export function lineIntersectsRotatedRect(x1, y1, x2, y2, rect) {
+    // Get the corners of the rotated rectangle
+    const corners = rect.getCorners();
+    
+    // Check if line intersects with any of the four sides of the rotated rectangle
+    for (let i = 0; i < 4; i++) {
+        const j = (i + 1) % 4;
+        if (lineIntersectsLine(
+            x1, y1, x2, y2,
+            corners[i].x, corners[i].y, corners[j].x, corners[j].y
+        )) {
+            return true;
+        }
+    }
+    
+    return false;
+}
+
 export function calculateVisionRay(startX, startY, angle, maxDistance, roomObjects) {
     const endX = startX + Math.cos(angle) * maxDistance;
     const endY = startY + Math.sin(angle) * maxDistance;
@@ -128,41 +81,19 @@ export function calculateVisionRay(startX, startY, angle, maxDistance, roomObjec
     
     // Check each object for intersection
     for (const obj of roomObjects) {
-        // If object is rotated, check against each edge of the rotated rectangle
-        if (obj.angle !== 0) {
-            const corners = obj.getCorners();
+        // Get the corners of the rotated rectangle
+        const corners = obj.getCorners();
+        
+        // Check all four sides of the rotated object
+        for (let i = 0; i < 4; i++) {
+            const j = (i + 1) % 4;
+            const intersection = rayLineIntersection(
+                startX, startY, endX, endY,
+                corners[i].x, corners[i].y, corners[j].x, corners[j].y
+            );
             
-            // Check all four sides of the rotated object
-            for (let i = 0; i < 4; i++) {
-                const nextIndex = (i + 1) % 4;
-                const intersection = rayLineIntersection(
-                    startX, startY, endX, endY,
-                    corners[i].x, corners[i].y, 
-                    corners[nextIndex].x, corners[nextIndex].y
-                );
-                
-                if (intersection && intersection.t < closestIntersection.t && intersection.t > 0) {
-                    closestIntersection = intersection;
-                }
-            }
-        } else {
-            // Original code for non-rotated objects
-            const sides = [
-                { x1: obj.x, y1: obj.y, x2: obj.x + obj.width, y2: obj.y }, // Top
-                { x1: obj.x, y1: obj.y + obj.height, x2: obj.x + obj.width, y2: obj.y + obj.height }, // Bottom
-                { x1: obj.x, y1: obj.y, x2: obj.x, y2: obj.y + obj.height }, // Left
-                { x1: obj.x + obj.width, y1: obj.y, x2: obj.x + obj.width, y2: obj.y + obj.height }  // Right
-            ];
-            
-            for (const side of sides) {
-                const intersection = rayLineIntersection(
-                    startX, startY, endX, endY,
-                    side.x1, side.y1, side.x2, side.y2
-                );
-                
-                if (intersection && intersection.t < closestIntersection.t && intersection.t > 0) {
-                    closestIntersection = intersection;
-                }
+            if (intersection && intersection.t < closestIntersection.t && intersection.t > 0) {
+                closestIntersection = intersection;
             }
         }
     }
@@ -196,4 +127,56 @@ export function rayLineIntersection(x1, y1, x2, y2, x3, y3, x4, y4) {
     }
     
     return null;
+}
+
+export function updateFurniturePhysics(furniture, canvasWidth, canvasHeight) {
+    furniture.forEach(obj => {
+        // Update position
+        obj.x += obj.vx;
+        obj.y += obj.vy;
+        
+        // Update rotation - make rotation stiffer by reducing angular velocity more
+        obj.angle += obj.angularVelocity * 0.7; // Apply a 30% reduction to make rotation stiffer
+        
+        // Apply friction - increased for better stickiness
+        obj.vx *= 0.95;
+        obj.vy *= 0.95;
+        obj.angularVelocity *= 0.9; // More friction on rotation
+        
+        // Reset velocity if it's very small
+        if (Math.abs(obj.vx) < 0.1) obj.vx = 0;
+        if (Math.abs(obj.vy) < 0.1) obj.vy = 0;
+        if (Math.abs(obj.angularVelocity) < 0.01) obj.angularVelocity = 0;
+        
+        // Bounce off walls
+        if (obj.x < 0) {
+            obj.x = 0;
+            obj.vx = -obj.vx * 0.5;
+        } else if (obj.x + obj.width > canvasWidth) {
+            obj.x = canvasWidth - obj.width;
+            obj.vx = -obj.vx * 0.5;
+        }
+        
+        if (obj.y < 0) {
+            obj.y = 0;
+            obj.vy = -obj.vy * 0.5;
+        } else if (obj.y + obj.height > canvasHeight) {
+            obj.y = canvasHeight - obj.height;
+            obj.vy = -obj.vy * 0.5;
+        }
+    });
+    
+    // Process furniture collisions
+    handleFurnitureCollisions(furniture);
+}
+
+export function handleFurnitureCollisions(furniture) {
+    // Check for collisions between all pairs of objects
+    for (let i = 0; i < furniture.length; i++) {
+        for (let j = i + 1; j < furniture.length; j++) {
+            if (furniture[i].collidesWith(furniture[j])) {
+                furniture[i].handleCollision(furniture[j]);
+            }
+        }
+    }
 }
