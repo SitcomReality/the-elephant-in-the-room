@@ -14,7 +14,6 @@ export class WaterParticle {
     update() {
         // Simple physics
         this.x += this.vx;
-        this.vy += 0.05; // Gravity
         this.y += this.vy;
         
         // Slow down
@@ -107,7 +106,7 @@ export class WaterSystem {
     
     findConnectedParticles(index, processed, group) {
         const particle = this.particles[index];
-        const proximity = 20; // Maximum distance to consider particles connected
+        const proximity = 100; // Increased from 20 to 100 (5x) to form larger pools
         
         for (let i = 0; i < this.particles.length; i++) {
             if (processed.has(i)) continue;
