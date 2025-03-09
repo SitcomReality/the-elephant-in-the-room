@@ -96,12 +96,12 @@ export const mouse = {
 // Game objects
 const furnitureSprites = getFurnitureSprites();
 const roomObjects = [
-    new RoomObject(100, 100, 140, 70, furnitureSprites[0], furnitureSprites[0].mass, furnitureSprites[0].name),
-    new RoomObject(300, 150, 160, 100, furnitureSprites[1], furnitureSprites[1].mass, furnitureSprites[1].name),
-    new RoomObject(500, 100, 120, 110, furnitureSprites[2], furnitureSprites[2].mass, furnitureSprites[2].name),
-    new RoomObject(650, 300, 140, 100, furnitureSprites[4], furnitureSprites[4].mass, furnitureSprites[4].name),
-    new RoomObject(100, 400, 100, 70, furnitureSprites[5], furnitureSprites[5].mass, furnitureSprites[5].name),
-    new RoomObject(400, 450, 150, 160, furnitureSprites[3], furnitureSprites[3].mass, furnitureSprites[3].name),
+    new RoomObject(100, 100, 190, 85, furnitureSprites[0], furnitureSprites[0].mass, furnitureSprites[0].name),
+    new RoomObject(300, 150, 165, 100, furnitureSprites[1], furnitureSprites[1].mass, furnitureSprites[1].name),
+    new RoomObject(500, 100, 105, 86, furnitureSprites[2], furnitureSprites[2].mass, furnitureSprites[2].name),
+    new RoomObject(650, 300, 124, 106, furnitureSprites[4], furnitureSprites[4].mass, furnitureSprites[4].name),
+    new RoomObject(100, 400, 129, 118, furnitureSprites[5], furnitureSprites[5].mass, furnitureSprites[5].name),
+    new RoomObject(400, 450, 169, 150, furnitureSprites[3], furnitureSprites[3].mass, furnitureSprites[3].name),
 ];
 
 const player = new Player(canvas.width / 2, canvas.height / 2);

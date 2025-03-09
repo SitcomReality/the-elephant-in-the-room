@@ -1,21 +1,21 @@
 // Spritesheet definitions and utility functions for loading sprites
 export const spritesheet = new Image();
-spritesheet.src = '/eitr_furniture_pickups.png';
+spritesheet.src = '/eitr_spritesheet.png';
 
 // Sprite definitions from the spritesheet
 export const sprites = {
-  rectangular_table: { x: 59, y: 92, width: 142, height: 73, name: "rectangular table", mass: 5 },
-  pool_table: { x: 300, y: 65, width: 168, height: 106, name: "pool table", mass: 7 },
-  pot_plant: { x: 582, y: 73, width: 117, height: 111, name: "pot plant", mass: 2 },
-  queen_bed: { x: 53, y: 300, width: 150, height: 169, name: "queen bed", mass: 8 },
-  coffee_table: { x: 315, y: 338, width: 137, height: 98, name: "coffee table", mass: 4 },
-  bookshelf: { x: 595, y: 349, width: 102, height: 73, name: "bookshelf", mass: 6 },
-  pickup_10percent: { x: 78, y: 594, width: 101, height: 92, type: "score" },
-  pickup_plus50: { x: 338, y: 598, width: 95, height: 80, type: "points" },
-  pickup_plus1x: { x: 576, y: 577, width: 129, height: 125, type: "multiplier" },
-  pickup_r: { x: 81, y: 845, width: 122, height: 101, type: "reset" },
-  pickup_e: { x: 318, y: 829, width: 138, height: 135, type: "rocket" },
-  pickup_d: { x: 580, y: 846, width: 121, height: 96, type: "blind" }
+  dining_table_made_of: { x: 31, y: 55, width: 196, height: 85, name: "dining table", mass: 5 },
+  pool_table_with_warm: { x: 302, y: 62, width: 165, height: 103, name: "pool table", mass: 7 },
+  books_on_top_of_a_sh: { x: 587, y: 81, width: 105, height: 86, name: "bookshelf", mass: 3 },
+  queen_bed_with_a_cat: { x: 45, y: 308, width: 169, height: 150, name: "queen bed", mass: 8 },
+  wooden_chest: { x: 322, y: 332, width: 124, height: 106, name: "wooden chest", mass: 6 },
+  filing_cabinet_made_: { x: 578, y: 324, width: 129, height: 118, name: "filing cabinet", mass: 4 },
+  pickup_10percent: { x: 63, y: 576, width: 130, height: 129, type: "score" },
+  pickup_plus50: { x: 322, y: 581, width: 130, height: 111, type: "points" },
+  pickup_plus1x: { x: 580, y: 574, width: 125, height: 123, type: "multiplier" },
+  pickup_R: { x: 81, y: 845, width: 122, height: 101, type: "reset" },
+  pickup_E: { x: 318, y: 829, width: 137, height: 134, type: "rocket" },
+  pickup_D: { x: 580, y: 846, width: 121, height: 96, type: "blind" }
 };
 
 // Get furniture sprites only
