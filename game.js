@@ -18,69 +18,25 @@ canvas.height = canvas.parentElement.clientHeight;
 
 // Floor pattern variables
 let floorPattern;
-let floorPatternType;
 function createFloorPattern() {
-    floorPatternType = Math.floor(Math.random() * 4); // 4 different pattern types
-    
     const tempCanvas = document.createElement('canvas');
     const tempCtx = tempCanvas.getContext('2d');
     tempCanvas.width = 200;
     tempCanvas.height = 200;
     
-    switch (floorPatternType) {
-        case 0: // Subtle grid pattern
-            tempCtx.fillStyle = '#444444';
-            tempCtx.fillRect(0, 0, 200, 200);
-            tempCtx.strokeStyle = '#4a4a4a';
-            tempCtx.lineWidth = 1;
-            
-            for (let i = 0; i < 200; i += 20) {
-                tempCtx.beginPath();
-                tempCtx.moveTo(0, i);
-                tempCtx.lineTo(200, i);
-                tempCtx.stroke();
-                
-                tempCtx.beginPath();
-                tempCtx.moveTo(i, 0);
-                tempCtx.lineTo(i, 200);
-                tempCtx.stroke();
-            }
-            break;
-        case 1: // Radial gradient
-            const gradient = tempCtx.createRadialGradient(100, 100, 0, 100, 100, 150);
-            gradient.addColorStop(0, '#4a4a4a');
-            gradient.addColorStop(1, '#383838');
-            tempCtx.fillStyle = gradient;
-            tempCtx.fillRect(0, 0, 200, 200);
-            break;
-        case 2: // Noise texture
-            tempCtx.fillStyle = '#444444';
-            tempCtx.fillRect(0, 0, 200, 200);
-            
-            for (let x = 0; x < 200; x++) {
-                for (let y = 0; y < 200; y++) {
-                    if (Math.random() > 0.92) {
-                        tempCtx.fillStyle = `rgba(50, 50, 50, ${Math.random() * 0.4})`;
-                        tempCtx.fillRect(x, y, 1, 1);
-                    }
-                }
-            }
-            break;
-        case 3: // Subtle wood pattern
-            tempCtx.fillStyle = '#4a4a4a';
-            tempCtx.fillRect(0, 0, 200, 200);
-            
-            tempCtx.strokeStyle = 'rgba(60, 60, 60, 0.3)';
-            tempCtx.lineWidth = 5;
-            
-            for (let i = -40; i < 240; i += 20) {
-                const offset = Math.sin(i * 0.1) * 10;
-                tempCtx.beginPath();
-                tempCtx.moveTo(0, i + offset);
-                tempCtx.lineTo(200, i + offset + Math.sin(i * 0.05) * 15);
-                tempCtx.stroke();
-            }
-            break;
+    // Only use the wood pattern (former case 3)
+    tempCtx.fillStyle = `rgb(${70 + Math.random() * 10}, ${70 + Math.random() * 10}, ${70 + Math.random() * 10})`;
+    tempCtx.fillRect(0, 0, 200, 200);
+    
+    tempCtx.strokeStyle = `rgba(${60 + Math.random() * 10}, ${60 + Math.random() * 10}, ${60 + Math.random() * 10}, ${0.2 + Math.random() * 0.2})`;
+    tempCtx.lineWidth = 4 + Math.random() * 2;
+    
+    for (let i = -40; i < 240; i += 15 + Math.random() * 10) {
+        const offset = Math.sin(i * (0.08 + Math.random() * 0.04)) * (8 + Math.random() * 4);
+        tempCtx.beginPath();
+        tempCtx.moveTo(0, i + offset);
+        tempCtx.lineTo(200, i + offset + Math.sin(i * (0.04 + Math.random() * 0.02)) * (12 + Math.random() * 6));
+        tempCtx.stroke();
     }
     
     floorPattern = ctx.createPattern(tempCanvas, 'repeat');
@@ -94,6 +50,9 @@ let gameStartTime = Date.now();
 let lastHumanSpawnTime = 0;
 let humanSpawnInterval = 10000; // 10 seconds
 let gameActive = false; // Track if game has started
+let gamePaused = false; // Track if game is paused
+let lastUpdateTime = Date.now(); // For time-based calculations
+let pauseOverlay = null; // Reference to pause overlay element
 
 // Score multiplier system
 let scoreMultiplier = 0;
@@ -157,7 +116,15 @@ const doors = [
 
 // Input handling
 window.addEventListener('keydown', (e) => {
-    if (gameOver || isLevelingUp) return;
+    if (gameOver) return;
+    
+    // Handle pause
+    if (e.key === 'p' || e.key === 'P' || e.key === 'Escape' || e.key === 'Pause') {
+        togglePause();
+        return;
+    }
+    
+    if (gamePaused || isLevelingUp) return;
     
     switch (e.key) {
         case 'ArrowUp':
@@ -273,15 +240,53 @@ document.getElementById('restart-btn').addEventListener('click', () => {
     resetGame();
 });
 
+// Create pause overlay
+function createPauseOverlay() {
+    if (!pauseOverlay) {
+        pauseOverlay = document.createElement('div');
+        pauseOverlay.id = 'pause-overlay';
+        pauseOverlay.innerHTML = `
+            <div class="pause-content">
+                <h2>Game Paused</h2>
+                <p>Press P, ESC, or Pause/Break to resume</p>
+            </div>
+        `;
+        document.getElementById('game-container').appendChild(pauseOverlay);
+    }
+}
+
+// Toggle pause state
+function togglePause() {
+    gamePaused = !gamePaused;
+    
+    // Create pause overlay if it doesn't exist
+    if (!pauseOverlay) {
+        createPauseOverlay();
+    }
+    
+    // Toggle visibility
+    pauseOverlay.style.display = gamePaused ? 'flex' : 'none';
+    
+    // Reset time tracking when unpausing to prevent time jump
+    if (!gamePaused) {
+        lastUpdateTime = Date.now();
+    }
+}
+
 // Game functions
 function resetGame() {
     gameOver = false;
+    gamePaused = false;
     score = 0;
     gameStartTime = Date.now();
     lastHumanSpawnTime = 0;
     lastPickupSpawnTime = 0;
     scoreMultiplier = 0;
     lastMultiplierIncreaseTime = 0;
+    lastUpdateTime = Date.now(); // Reset time tracking
+    
+    // Create new floor pattern
+    createFloorPattern();
     
     // Reset level progression
     playerLevel = 1;
@@ -314,8 +319,10 @@ function resetGame() {
     // Hide game over screen
     document.getElementById('game-over').classList.add('hidden');
     
-    // Start animation loop again
-    requestAnimationFrame(gameLoop);
+    // Hide pause overlay if visible
+    if (pauseOverlay) {
+        pauseOverlay.style.display = 'none';
+    }
 }
 
 function spawnHuman() {
@@ -426,8 +433,6 @@ function updateMultiplier(currentTime) {
         scoreMultiplier = Math.max(0, scoreMultiplier - (actualDecayRate * deltaTime));
     }
 }
-
-let lastUpdateTime = Date.now();
 
 function updateHumans() {
     const currentTime = Date.now();
@@ -987,21 +992,28 @@ function gameLoop() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     
     const currentTime = Date.now();
+    const deltaTime = currentTime - lastUpdateTime;
+    lastUpdateTime = currentTime;
     
     if (!gameOver && gameActive) {
-        if (!isLevelingUp) {
+        if (!isLevelingUp && !gamePaused) {
             // Update game objects
             updatePlayer();
             updateObjects();
             updateHumans();
             updateMultiplier(currentTime);
             updatePickups();
+            
+            updateScore(currentTime);
         }
-        
-        updateScore(currentTime);
         
         // Render everything
         render();
+        
+        // Render pause overlay if needed
+        if (gamePaused && pauseOverlay) {
+            pauseOverlay.style.display = 'flex';
+        }
     }
     
     // Continue the game loop

@@ -322,6 +322,39 @@ body {
     opacity: 1;
 }
 
+/* Pause overlay styles */
+#pause-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.7);
+    display: none;
+    justify-content: center;
+    align-items: center;
+    z-index: 250;
+}
+
+.pause-content {
+    background-color: rgba(50, 50, 50, 0.9);
+    padding: 30px 50px;
+    border-radius: 10px;
+    border: 3px solid #ffcc00;
+    text-align: center;
+    color: white;
+}
+
+.pause-content h2 {
+    color: #ffcc00;
+    font-size: 32px;
+    margin-bottom: 20px;
+}
+
+.pause-content p {
+    font-size: 18px;
+}
+
 /* Splash screen styles */
 #splash-screen {
     position: absolute;
