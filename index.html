@@ -6,11 +6,13 @@
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
+    <div id="pause-button-container">
+      <button id="pause-button" aria-label="Pause game">⏸️</button>
+    </div>
     <div id="game-container">
         <!-- Preload the spritesheet -->
         <img src="/eitr_furniture_pickups.png" id="furniture-spritesheet" style="display: none;">
-        <img src="/eitr_albumcover.jpg" id="album-cover" style="display: none;">
-        
+        <img src="/eitr_albumcover.jpg" id="album-cover" style="display: none;">      
         <div id="splash-screen">
             <div class="splash-image-container">
                 <img src="/eitr_albumcover.jpg" alt="The Elephant in the Room">
@@ -19,9 +21,6 @@
         </div>
         
         <canvas id="gameCanvas"></canvas>
-        <div id="pause-button-container">
-            <button id="pause-button" aria-label="Pause game">⏸️</button>
-        </div>
         <div id="game-over" class="hidden">
             <h2>Game Over!</h2>
             <p>You were spotted by a human.</p>
