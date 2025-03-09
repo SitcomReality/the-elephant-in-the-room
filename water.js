@@ -35,11 +35,11 @@ export class WaterSystem {
         this.particles = [];
         this.maxParticles = 10; // Default max particles
         this.lastEmissionTime = 0;
-        this.emissionCooldown = 150; // Changed from 250ms to 150ms between emissions
+        this.emissionCooldown = 100; // Changed from 150ms to 100ms between emissions
         this.waterColor = '#5A9BD5'; // Base water color
         this.particleLifetime = 3000; // 3 seconds
-        this.requiredFreeSlots = 3; // Minimum number of free slots required to emit
-        this.minEmissionCount = 3; // Minimum number of particles to emit per click
+        this.requiredFreeSlots = 5; // Changed from 3 to 5 minimum free slots required
+        this.minEmissionCount = 5; // Changed from 3 to 5 minimum particles per click
         this.emissionsRemaining = 0; // Counter for remaining emissions in burst
         this.emissionDirection = { x: 0, y: 0 }; // Store direction for consistent bursts
     }
