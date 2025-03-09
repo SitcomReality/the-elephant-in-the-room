@@ -1,4 +1,4 @@
-import { circleRectangleCollision, calculateVisionRay, lineIntersectsRect } from './physics.js';
+import { circleRectangleCollision, calculateVisionRay } from './physics.js';
 
 export class Human {
     constructor(x, y, direction) {
@@ -238,18 +238,6 @@ export class Human {
     resetVision(currentTime) {
         this.visionDistance = 0;
         this.visionGrowthStartTime = currentTime;
-    }
-    
-    isLineOfSightBlocked(x1, y1, x2, y2, roomObjects) {
-        // Check each object to see if it blocks the line of sight
-        for (const obj of roomObjects) {
-            // Check intersection with the object, passing the rotation angle
-            if (lineIntersectsRect(x1, y1, x2, y2, obj.x, obj.y, obj.width, obj.height, obj.angle)) {
-                return true;
-            }
-        }
-        
-        return false;
     }
     
     drawVisionCone(ctx) {

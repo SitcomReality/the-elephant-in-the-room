@@ -17,7 +17,8 @@ export class RoomObject {
         // Add rotation properties
         this.angle = 0;
         this.angularVelocity = 0;
-        this.rotationInertia = mass * (width * width + height * height) / 12; // Moment of inertia for rectangle
+        // Increase rotational inertia for stiffer rotation
+        this.rotationInertia = mass * (width * width + height * height) / 6; // Increased from /12 to /6
     }
     
     resetVelocity() {
@@ -40,7 +41,8 @@ export class RoomObject {
         // Apply friction
         this.vx *= 0.95;
         this.vy *= 0.95;
-        this.angularVelocity *= 0.95;
+        // Increase angular velocity damping for stiffer rotation
+        this.angularVelocity *= 0.9; // Increased from 0.95 to 0.9
         
         // Reset velocity if it's very small
         if (Math.abs(this.vx) < 0.1) this.vx = 0;
@@ -220,18 +222,15 @@ export class RoomObject {
         other.vx += impulseX / other.mass;
         other.vy += impulseY / other.mass;
         
-        // Make rotations stiffer by reducing the angular impulse
-        const angularDamping = 0.4; // Reduce angular impulse by 60%
-        
         // Apply angular impulse based on offset from center
         const thisOffsetX = dx / 2;
         const thisOffsetY = dy / 2;
         const otherOffsetX = -dx / 2;
         const otherOffsetY = -dy / 2;
         
-        // Cross product to calculate torque with damping
-        this.angularVelocity += (thisOffsetX * impulseY - thisOffsetY * impulseX) / this.rotationInertia * angularDamping;
-        other.angularVelocity += (otherOffsetX * impulseY - otherOffsetY * impulseX) / other.rotationInertia * angularDamping;
+        // Cross product to calculate torque
+        this.angularVelocity += (thisOffsetX * impulseY - thisOffsetY * impulseX) / this.rotationInertia;
+        other.angularVelocity += (otherOffsetX * impulseY - otherOffsetY * impulseX) / other.rotationInertia;
         
         // Push objects apart to prevent sticking
         const penetration = 0.1; // Small value to separate objects
