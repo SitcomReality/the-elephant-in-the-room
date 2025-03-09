@@ -16,12 +16,84 @@ const ctx = canvas.getContext('2d');
 canvas.width = canvas.parentElement.clientWidth;
 canvas.height = canvas.parentElement.clientHeight;
 
+// Floor pattern variables
+let floorPattern;
+let floorPatternType;
+function createFloorPattern() {
+    floorPatternType = Math.floor(Math.random() * 4); // 4 different pattern types
+    
+    const tempCanvas = document.createElement('canvas');
+    const tempCtx = tempCanvas.getContext('2d');
+    tempCanvas.width = 200;
+    tempCanvas.height = 200;
+    
+    switch (floorPatternType) {
+        case 0: // Subtle grid pattern
+            tempCtx.fillStyle = '#444444';
+            tempCtx.fillRect(0, 0, 200, 200);
+            tempCtx.strokeStyle = '#4a4a4a';
+            tempCtx.lineWidth = 1;
+            
+            for (let i = 0; i < 200; i += 20) {
+                tempCtx.beginPath();
+                tempCtx.moveTo(0, i);
+                tempCtx.lineTo(200, i);
+                tempCtx.stroke();
+                
+                tempCtx.beginPath();
+                tempCtx.moveTo(i, 0);
+                tempCtx.lineTo(i, 200);
+                tempCtx.stroke();
+            }
+            break;
+        case 1: // Radial gradient
+            const gradient = tempCtx.createRadialGradient(100, 100, 0, 100, 100, 150);
+            gradient.addColorStop(0, '#4a4a4a');
+            gradient.addColorStop(1, '#383838');
+            tempCtx.fillStyle = gradient;
+            tempCtx.fillRect(0, 0, 200, 200);
+            break;
+        case 2: // Noise texture
+            tempCtx.fillStyle = '#444444';
+            tempCtx.fillRect(0, 0, 200, 200);
+            
+            for (let x = 0; x < 200; x++) {
+                for (let y = 0; y < 200; y++) {
+                    if (Math.random() > 0.92) {
+                        tempCtx.fillStyle = `rgba(50, 50, 50, ${Math.random() * 0.4})`;
+                        tempCtx.fillRect(x, y, 1, 1);
+                    }
+                }
+            }
+            break;
+        case 3: // Subtle wood pattern
+            tempCtx.fillStyle = '#4a4a4a';
+            tempCtx.fillRect(0, 0, 200, 200);
+            
+            tempCtx.strokeStyle = 'rgba(60, 60, 60, 0.3)';
+            tempCtx.lineWidth = 5;
+            
+            for (let i = -40; i < 240; i += 20) {
+                const offset = Math.sin(i * 0.1) * 10;
+                tempCtx.beginPath();
+                tempCtx.moveTo(0, i + offset);
+                tempCtx.lineTo(200, i + offset + Math.sin(i * 0.05) * 15);
+                tempCtx.stroke();
+            }
+            break;
+    }
+    
+    floorPattern = ctx.createPattern(tempCanvas, 'repeat');
+}
+createFloorPattern();
+
 // Game variables
 let gameOver = false;
 let score = 0;
 let gameStartTime = Date.now();
 let lastHumanSpawnTime = 0;
 let humanSpawnInterval = 10000; // 10 seconds
+let gameActive = false; // Track if game has started
 
 // Score multiplier system
 let scoreMultiplier = 0;
@@ -454,11 +526,13 @@ function updateLevelProgressUI() {
     const previousThreshold = nextLevelIndex > 0 ? levelUpThresholds[nextLevelIndex - 1] : 0;
     const nextThreshold = levelUpThresholds[nextLevelIndex] || levelUpThresholds[levelUpThresholds.length - 1];
     
-    // Calculate progress to next level
-    const progress = Math.min(
+    // Calculate progress to next level - ensure it never decreases
+    const currentProgress = document.getElementById('level-progress-bar').style.width.replace('%', '') || 0;
+    const calculatedProgress = Math.min(
         (score - previousThreshold) / (nextThreshold - previousThreshold) * 100, 
         100
     );
+    const progress = Math.max(parseFloat(currentProgress), calculatedProgress);
     
     // Update progress bar
     const progressBar = document.getElementById('level-progress-bar');
@@ -795,7 +869,7 @@ function renderPickup(pickup) {
         
         // Add glow effect
         ctx.shadowColor = getPickupGlowColor(pickup.type);
-        ctx.shadowBlur = 10;
+        ctx.shadowBlur = !gameActive ? 0 : 10;
         
         ctx.drawImage(
             spritesheet,
@@ -850,7 +924,7 @@ function renderPickup(pickup) {
         
         // Add glow effect
         ctx.shadowColor = glowColor;
-        ctx.shadowBlur = 10;
+        ctx.shadowBlur = !gameActive ? 0 : 10;
         ctx.strokeStyle = '#ffffff';
         ctx.lineWidth = 2;
         ctx.strokeRect(pickup.x, pickup.y, 40, 40);
@@ -882,6 +956,10 @@ function render() {
     // Clear canvas
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     
+    // Draw floor pattern
+    ctx.fillStyle = floorPattern;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    
     // Draw game objects
     roomObjects.forEach(obj => obj.render(ctx));
     
@@ -910,7 +988,7 @@ function gameLoop() {
     
     const currentTime = Date.now();
     
-    if (!gameOver) {
+    if (!gameOver && gameActive) {
         if (!isLevelingUp) {
             // Update game objects
             updatePlayer();
@@ -924,10 +1002,10 @@ function gameLoop() {
         
         // Render everything
         render();
-        
-        // Continue the game loop
-        requestAnimationFrame(gameLoop);
     }
+    
+    // Continue the game loop
+    requestAnimationFrame(gameLoop);
 }
 
 // Initial setup
@@ -947,8 +1025,33 @@ levelIndicator.textContent = 'Level 1';
 document.getElementById('game-container').appendChild(levelProgressContainer);
 document.getElementById('game-container').appendChild(levelIndicator);
 
-// Start the game
-resetGame();
+// Start the animation loop but don't reset the game yet
+// The game will actually start when the start button is clicked
+requestAnimationFrame(gameLoop);
+
+// Initialize game on start button click
+document.getElementById('start-btn').addEventListener('click', () => {
+    document.getElementById('splash-screen').style.display = 'none';
+    gameActive = true;
+    resetGame();
+});
+
+// Handle window resize
+window.addEventListener('resize', () => {
+    // Update canvas dimensions to match container
+    canvas.width = canvas.parentElement.clientWidth;
+    canvas.height = canvas.parentElement.clientHeight;
+    
+    // Recreate floor pattern on resize
+    createFloorPattern();
+});
+
+// End game function
+function endGame() {
+    gameOver = true;
+    document.getElementById('final-score').textContent = score;
+    document.getElementById('game-over').classList.remove('hidden');
+}
 
 // Export game state for other modules
 export const getGameState = () => ({
@@ -968,17 +1071,3 @@ window.gameState = {
     ctx,
     roomObjects
 };
-
-// End game function
-function endGame() {
-    gameOver = true;
-    document.getElementById('final-score').textContent = score;
-    document.getElementById('game-over').classList.remove('hidden');
-}
-
-// Handle window resize
-window.addEventListener('resize', () => {
-    // Update canvas dimensions to match container
-    canvas.width = canvas.parentElement.clientWidth;
-    canvas.height = canvas.parentElement.clientHeight;
-});
