@@ -350,7 +350,7 @@ body {
     display: none;
     justify-content: center;
     align-items: center;
-    z-index: 250;
+    z-index: 350;
 }
 
 .pause-content {
