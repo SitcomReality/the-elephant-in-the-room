@@ -116,15 +116,12 @@ const doors = [
 
 // Input handling
 window.addEventListener('keydown', (e) => {
-    if (gameOver) return;
-    
-    // Handle pause
     if (e.key === 'p' || e.key === 'P' || e.key === 'Escape' || e.key === 'Pause') {
         togglePause();
         return;
     }
     
-    if (gamePaused || isLevelingUp) return;
+    if (gameOver || gamePaused || isLevelingUp) return;
     
     switch (e.key) {
         case 'ArrowUp':
@@ -269,23 +266,34 @@ function createPauseOverlay() {
 
 // Toggle pause state
 function togglePause() {
-    gamePaused = !gamePaused;
+    // Only toggle the game pause state if we're in active gameplay and not in game over
+    if (gameActive && !gameOver && !isLevelingUp) {
+        gamePaused = !gamePaused;
+        
+        // Reset time tracking when unpausing to prevent time jump
+        if (!gamePaused) {
+            lastUpdateTime = Date.now();
+            secondaryPickupTimer = Date.now() + secondaryPickupInterval;
+            lastHumanSpawnTime = Date.now();
+            lastPickupSpawnTime = Date.now();
+            lastMultiplierIncreaseTime = Date.now();
+        }
+    }
     
     // Create pause overlay if it doesn't exist
     if (!pauseOverlay) {
         createPauseOverlay();
     }
     
-    // Toggle visibility
-    pauseOverlay.style.display = gamePaused ? 'flex' : 'none';
+    // Toggle overlay visibility regardless of game state
+    if (pauseOverlay.style.display === 'none' || pauseOverlay.style.display === '') {
+        pauseOverlay.style.display = 'flex';
+    } else {
+        pauseOverlay.style.display = 'none';
+    }
     
     // Update pause button icon
     updatePauseButtonIcon();
-    
-    // Reset time tracking when unpausing to prevent time jump
-    if (!gamePaused) {
-        lastUpdateTime = Date.now();
-    }
 }
 
 // Update the pause button icon based on game state
@@ -537,8 +545,8 @@ function isLineOfSightBlocked(x1, y1, x2, y2) {
 }
 
 function updateScore(currentTime) {
-    // Only update score if game is not paused
-    if (isLevelingUp) return;
+    // Only update score if game is not paused and not in level up screen
+    if (gamePaused || isLevelingUp) return;
     
     // Calculate base score from time
     const baseScore = Math.floor((currentTime - gameStartTime) / 1000);
@@ -567,16 +575,16 @@ function updateLevelProgressUI() {
     const nextThreshold = levelUpThresholds[nextLevelIndex] || levelUpThresholds[levelUpThresholds.length - 1];
     
     // Calculate progress to next level - ensure it never decreases
-    const currentProgress = document.getElementById('level-progress-bar').style.width.replace('%', '') || 0;
+    const currentProgressElement = document.getElementById('level-progress-bar');
+    const currentProgress = currentProgressElement.style.width ? parseFloat(currentProgressElement.style.width) : 0;
     const calculatedProgress = Math.min(
         (score - previousThreshold) / (nextThreshold - previousThreshold) * 100, 
         100
     );
-    const progress = Math.max(parseFloat(currentProgress), calculatedProgress);
+    const progress = Math.max(currentProgress, calculatedProgress);
     
     // Update progress bar
-    const progressBar = document.getElementById('level-progress-bar');
-    progressBar.style.width = `${progress}%`;
+    currentProgressElement.style.width = `${progress}%`;
     
     // Update level indicator
     document.getElementById('level-indicator').textContent = `Level ${playerLevel}`;
@@ -1027,11 +1035,13 @@ function gameLoop() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     
     const currentTime = Date.now();
-    const deltaTime = currentTime - lastUpdateTime;
-    lastUpdateTime = currentTime;
     
     if (!gameOver && gameActive) {
+        // Only calculate deltaTime if the game is not paused
         if (!isLevelingUp && !gamePaused) {
+            const deltaTime = currentTime - lastUpdateTime;
+            lastUpdateTime = currentTime;
+            
             // Update game objects
             updatePlayer();
             updateObjects();
@@ -1046,7 +1056,7 @@ function gameLoop() {
         render();
         
         // Render pause overlay if needed
-        if (gamePaused && pauseOverlay) {
+        if (pauseOverlay && pauseOverlay.style.display === 'flex') {
             pauseOverlay.style.display = 'flex';
         }
     }
@@ -1129,25 +1139,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Set up pause button
     const pauseButton = document.getElementById('pause-button');
     pauseButton.addEventListener('click', () => {
-        // If on splash screen or game over, show pause overlay with instructions
-        if (document.getElementById('splash-screen').style.display !== 'none' || 
-            !document.getElementById('game-over').classList.contains('hidden')) {
-            
-            // Create and show pause overlay with instructions only
-            if (!pauseOverlay) {
-                createPauseOverlay();
-            }
-            pauseOverlay.style.display = 'flex';
-            
-            // Custom title for info mode
-            const pauseTitle = pauseOverlay.querySelector('h2');
-            if (pauseTitle) {
-                pauseTitle.textContent = 'Game Information';
-            }
-        } else {
-            // Normal pause/unpause
-            togglePause();
-        }
+        togglePause();
     });
     
     // Initial button state
