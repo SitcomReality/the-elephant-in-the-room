@@ -653,7 +653,7 @@ function updateScore(currentTime) {
 function updateLevelProgressUI() {
     // Find next level threshold
     const nextLevelIndex = playerLevel - 1;
-    const!previousThreshold = nextLevelIndex > 0 ? levelUpThresholds[nextLevelIndex - 1] : 0;
+    const previousThreshold = nextLevelIndex > 0 ? levelUpThresholds[nextLevelIndex - 1] : 0;
     const nextThreshold = levelUpThresholds[nextLevelIndex] || levelUpThresholds[levelUpThresholds.length - 1];
     
     // Calculate progress to next level - ensure it's correctly reflecting current level progress
