@@ -6,6 +6,7 @@ import { Human } from './human.js';
 import { renderSpeechBubble, renderScoreMultiplier } from './ui.js';
 import { circleRectangleCollision, lineIntersectsRect } from './physics.js';
 import { upgrades, levelUpQuotes } from './progression.js';
+import { sprites, getFurnitureSprites, getPickupSprites } from './sprites.js';
 
 // Game canvas and context
 const canvas = document.getElementById('gameCanvas');
@@ -62,18 +63,17 @@ export const mouse = {
 };
 
 // Game objects
-const player = new Player(canvas.width / 2, canvas.height / 2);
-
+const furnitureSprites = getFurnitureSprites();
 const roomObjects = [
-    new RoomObject(100, 100, 120, 80, '#8B4513', 5, 'table'),
-    new RoomObject(300, 150, 80, 80, '#A0522D', 2, 'chair'),
-    new RoomObject(500, 100, 150, 60, '#DEB887', 6, 'sofa'),
-    new RoomObject(650, 300, 100, 60, '#CD853F', 3, 'coffee table'),
-    new RoomObject(100, 400, 40, 40, '#D2B48C', 1, 'small box'),
-    new RoomObject(400, 450, 60, 60, '#8B4513', 2, 'end table'),
-    new RoomObject(600, 450, 30, 40, '#A0522D', 0.5, 'vase'),
-    new RoomObject(200, 250, 50, 50, '#D2B48C', 1.5, 'stool'),
+    new RoomObject(100, 100, 140, 70, furnitureSprites[0], furnitureSprites[0].mass, furnitureSprites[0].name),
+    new RoomObject(300, 150, 160, 100, furnitureSprites[1], furnitureSprites[1].mass, furnitureSprites[1].name),
+    new RoomObject(500, 100, 120, 110, furnitureSprites[2], furnitureSprites[2].mass, furnitureSprites[2].name),
+    new RoomObject(650, 300, 140, 100, furnitureSprites[4], furnitureSprites[4].mass, furnitureSprites[4].name),
+    new RoomObject(100, 400, 100, 70, furnitureSprites[5], furnitureSprites[5].mass, furnitureSprites[5].name),
+    new RoomObject(400, 450, 150, 160, furnitureSprites[3], furnitureSprites[3].mass, furnitureSprites[3].name),
 ];
+
+const player = new Player(canvas.width / 2, canvas.height / 2);
 
 const humans = [];
 const doors = [
@@ -368,7 +368,7 @@ function updateHumans() {
     
     humans.forEach(human => {
         // Update human
-        human.update(currentTime, player, roomObjects, humans, canvas.width, canvas.height, doors);
+        human.update(currentTime, player, room seminarObjects, humans, canvas.width, canvas.height, doors);
         
         // Check if human can see the player
         if (isPlayerInVision(human)) {
@@ -635,6 +635,8 @@ function spawnPickup() {
     ];
     
     const pickupType = pickupTypes[Math.floor(Math.random() * pickupTypes.length)];
+    const pickupSprites = getPickupSprites();
+    const pickupSprite = pickupSprites.find(s => s.type === pickupType) || null;
     
     // Find a position away from the player and not inside objects
     let x, y;
@@ -685,7 +687,8 @@ function spawnPickup() {
         y,
         spawnTime: Date.now(),
         isActive: false, // For tracking temporary effects
-        duration: 5000 // Duration for temporary effects (5 seconds)
+        duration: 5000, // Duration for temporary effects (5 seconds)
+        sprite: pickupSprite // Add sprite reference
     };
     
     activePickups.push(pickup);
@@ -786,60 +789,93 @@ function endBlindEffect() {
 }
 
 function renderPickup(pickup) {
-    // Determine style based on pickup type
-    let color, text, glowColor;
-    
-    switch (pickup.type) {
-        case 'score':
-            color = '#0066ff';
-            text = '+10%';
-            glowColor = '#0099ff';
-            break;
-        case 'reset':
-            color = '#ff3300';
-            text = 'Reset';
-            glowColor = '#ff6600';
-            break;
-        case 'points':
-            color = '#00cc66';
-            text = '+50';
-            glowColor = '#00ff80';
-            break;
-        case 'multiplier':
-            color = '#ffcc00';
-            text = '+1.0x';
-            glowColor = '#ffdd44';
-            break;
-        case 'rocket':
-            color = '#ff00cc';
-            text = '';
-            glowColor = '#ff66dd';
-            break;
-        case 'blind':
-            color = '#9900cc';
-            text = '';
-            glowColor = '#cc66ff';
-            break;
+    if (pickup.sprite) {
+        // Draw from spritesheet
+        ctx.save();
+        
+        // Add glow effect
+        ctx.shadowColor = getPickupGlowColor(pickup.type);
+        ctx.shadowBlur = 10;
+        
+        ctx.drawImage(
+            spritesheet,
+            pickup.sprite.x, pickup.sprite.y,
+            pickup.sprite.width, pickup.sprite.height,
+            pickup.x, pickup.y,
+            40, 40
+        );
+        
+        ctx.restore();
+    } else {
+        // Fallback to old rendering method
+        // Determine style based on pickup type
+        let color, text, glowColor;
+        
+        switch (pickup.type) {
+            case 'score':
+                color = '#0066ff';
+                text = '+10%';
+                glowColor = '#0099ff';
+                break;
+            case 'reset':
+                color = '#ff3300';
+                text = 'Reset';
+                glowColor = '#ff6600';
+                break;
+            case 'points':
+                color = '#00cc66';
+                text = '+50';
+                glowColor = '#00ff80';
+                break;
+            case 'multiplier':
+                color = '#ffcc00';
+                text = '+1.0x';
+                glowColor = '#ffdd44';
+                break;
+            case 'rocket':
+                color = '#ff00cc';
+                text = '';
+                glowColor = '#ff66dd';
+                break;
+            case 'blind':
+                color = '#9900cc';
+                text = '';
+                glowColor = '#cc66ff';
+                break;
+        }
+        
+        // Draw pickup
+        ctx.fillStyle = color;
+        ctx.fillRect(pickup.x, pickup.y, 40, 40);
+        
+        // Add glow effect
+        ctx.shadowColor = glowColor;
+        ctx.shadowBlur = 10;
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(pickup.x, pickup.y, 40, 40);
+        ctx.shadowBlur = 0;
+        
+        // Draw text
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 14px Arial';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(text, pickup.x + 20, pickup.y + 20);
     }
-    
-    // Draw pickup
-    ctx.fillStyle = color;
-    ctx.fillRect(pickup.x, pickup.y, 40, 40);
-    
-    // Add glow effect
-    ctx.shadowColor = glowColor;
-    ctx.shadowBlur = 10;
-    ctx.strokeStyle = '#ffffff';
-    ctx.lineWidth = 2;
-    ctx.strokeRect(pickup.x, pickup.y, 40, 40);
-    ctx.shadowBlur = 0;
-    
-    // Draw text
-    ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 14px Arial';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(text, pickup.x + 20, pickup.y + 20);
+}
+
+// Helper function to get glow color for pickups
+function getPickupGlowColor(type) {
+    switch (type) {
+        case 'score': return '#0099ff';
+        case 'reset': return '#ff6600';
+        case 'points': return '#00ff80';
+        case 'multiplier': return '#ffdd44';
+        case 'rocket': return '#ff66dd';
+        case 'blind': return '#cc66ff';
+        default: return '#ffffff';
+    }
 }
 
 function render() {

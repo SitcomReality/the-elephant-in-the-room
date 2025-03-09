@@ -1,12 +1,14 @@
+import { spritesheet } from './sprites.js';
+
 export class RoomObject {
-    constructor(x, y, width, height, color, mass, name) {
+    constructor(x, y, width, height, sprite, mass, name) {
         this.x = x;
         this.y = y;
         this.initialX = x; // Store initial position for reset
         this.initialY = y;
         this.width = width;
         this.height = height;
-        this.color = color;
+        this.sprite = sprite; // Sprite data object
         this.mass = mass || 1;
         this.name = name || 'object';
         this.vx = 0;
@@ -52,7 +54,19 @@ export class RoomObject {
     }
     
     render(ctx) {
-        ctx.fillStyle = this.color;
-        ctx.fillRect(this.x, this.y, this.width, this.height);
+        if (this.sprite) {
+            // Draw sprite from spritesheet
+            ctx.drawImage(
+                spritesheet, 
+                this.sprite.x, this.sprite.y, 
+                this.sprite.width, this.sprite.height,
+                this.x, this.y, 
+                this.width, this.height
+            );
+        } else {
+            // Fallback to colored rectangle
+            ctx.fillStyle = 'black'; // default color if sprite is not provided
+            ctx.fillRect(this.x, this.y, this.width, this.height);
+        }
     }
 }
