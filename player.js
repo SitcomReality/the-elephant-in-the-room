@@ -119,14 +119,14 @@ export class Player {
             roomObjects.forEach(obj => {
                 if (circleRectangleCollision(
                     newX, this.y, this.radius,
-                    obj.x, obj.y, obj.width, obj.height
+                    obj.x, obj.y, obj.width, obj.height, obj.angle
                 )) {
                     canMoveX = false;
                 }
                 
                 if (circleRectangleCollision(
                     this.x, newY, this.radius,
-                    obj.x, obj.y, obj.width, obj.height
+                    obj.x, obj.y, obj.width, obj.height, obj.angle
                 )) {
                     canMoveY = false;
                 }
@@ -265,7 +265,7 @@ export class Player {
         roomObjects.forEach(obj => {
             if (circleRectangleCollision(
                 this.x, this.y, this.radius,
-                obj.x, obj.y, obj.width, obj.height
+                obj.x, obj.y, obj.width, obj.height, obj.angle
             )) {
                 // Calculate direction from elephant to mouse
                 const dx = mouse.x - this.x;
@@ -305,7 +305,7 @@ export class Player {
                 // Check if node is colliding with object
                 if (circleRectangleCollision(
                     node.x, node.y, node.radius,
-                    obj.x, obj.y, obj.width, obj.height
+                    obj.x, obj.y, obj.width, obj.height, obj.angle
                 )) {
                     // Whether swinging or not, apply force if the trunk is moving fast enough
                     if (nodeSpeed > 1.0) {

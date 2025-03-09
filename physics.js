@@ -36,14 +36,48 @@ export function circleRectangleCollision(circleX, circleY, circleRadius, rectX, 
     }
 }
 
-export function lineIntersectsRect(x1, y1, x2, y2, rx, ry, rw, rh) {
-    // Check if line intersects with any of the four sides of the rectangle
-    return (
-        lineIntersectsLine(x1, y1, x2, y2, rx, ry, rx + rw, ry) ||          // Top
-        lineIntersectsLine(x1, y1, x2, y2, rx, ry + rh, rx + rw, ry + rh) || // Bottom
-        lineIntersectsLine(x1, y1, x2, y2, rx, ry, rx, ry + rh) ||          // Left
-        lineIntersectsLine(x1, y1, x2, y2, rx + rw, ry, rx + rw, ry + rh)   // Right
-    );
+export function lineIntersectsRect(x1, y1, x2, y2, rx, ry, rw, rh, angle = 0) {
+    if (angle === 0) {
+        // Check if line intersects with any of the four sides of the rectangle
+        return (
+            lineIntersectsLine(x1, y1, x2, y2, rx, ry, rx + rw, ry) ||          // Top
+            lineIntersectsLine(x1, y1, x2, y2, rx, ry + rh, rx + rw, ry + rh) || // Bottom
+            lineIntersectsLine(x1, y1, x2, y2, rx, ry, rx, ry + rh) ||          // Left
+            lineIntersectsLine(x1, y1, x2, y2, rx + rw, ry, rx + rw, ry + rh)   // Right
+        );
+    } else {
+        // For rotated rectangles, get the four corners and check if line intersects any side
+        const centerX = rx + rw/2;
+        const centerY = ry + rh/2;
+        const corners = [
+            rotatePoint(rx, ry, centerX, centerY, angle),
+            rotatePoint(rx + rw, ry, centerX, centerY, angle),
+            rotatePoint(rx + rw, ry + rh, centerX, centerY, angle),
+            rotatePoint(rx, ry + rh, centerX, centerY, angle)
+        ];
+        
+        // Check each side of the rotated rectangle
+        return (
+            lineIntersectsLine(x1, y1, x2, y2, corners[0].x, corners[0].y, corners[1].x, corners[1].y) ||
+            lineIntersectsLine(x1, y1, x2, y2, corners[1].x, corners[1].y, corners[2].x, corners[2].y) ||
+            lineIntersectsLine(x1, y1, x2, y2, corners[2].x, corners[2].y, corners[3].x, corners[3].y) ||
+            lineIntersectsLine(x1, y1, x2, y2, corners[3].x, corners[3].y, corners[0].x, corners[0].y)
+        );
+    }
+}
+
+// Helper function to rotate a point around a center
+function rotatePoint(x, y, centerX, centerY, angle) {
+    const translatedX = x - centerX;
+    const translatedY = y - centerY;
+    
+    const rotatedX = translatedX * Math.cos(angle) - translatedY * Math.sin(angle);
+    const rotatedY = translatedX * Math.sin(angle) + translatedY * Math.cos(angle);
+    
+    return {
+        x: rotatedX + centerX,
+        y: rotatedY + centerY
+    };
 }
 
 export function lineIntersectsLine(x1, y1, x2, y2, x3, y3, x4, y4) {

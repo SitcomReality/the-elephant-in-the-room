@@ -617,8 +617,8 @@ function isPlayerInVision(human) {
 function isLineOfSightBlocked(x1, y1, x2, y2) {
     // Check each object to see if it blocks the line of sight
     for (const obj of roomObjects) {
-        // Check intersection with the object
-        if (lineIntersectsRect(x1, y1, x2, y2, obj.x, obj.y, obj.width, obj.height)) {
+        // Check intersection with the object, including rotation
+        if (lineIntersectsRect(x1, y1, x2, y2, obj.x, obj.y, obj.width, obj.height, obj.angle)) {
             return true;
         }
     }

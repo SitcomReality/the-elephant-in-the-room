@@ -220,15 +220,18 @@ export class RoomObject {
         other.vx += impulseX / other.mass;
         other.vy += impulseY / other.mass;
         
+        // Make rotations stiffer by reducing the angular impulse
+        const angularDamping = 0.4; // Reduce angular impulse by 60%
+        
         // Apply angular impulse based on offset from center
         const thisOffsetX = dx / 2;
         const thisOffsetY = dy / 2;
         const otherOffsetX = -dx / 2;
         const otherOffsetY = -dy / 2;
         
-        // Cross product to calculate torque
-        this.angularVelocity += (thisOffsetX * impulseY - thisOffsetY * impulseX) / this.rotationInertia;
-        other.angularVelocity += (otherOffsetX * impulseY - otherOffsetY * impulseX) / other.rotationInertia;
+        // Cross product to calculate torque with damping
+        this.angularVelocity += (thisOffsetX * impulseY - thisOffsetY * impulseX) / this.rotationInertia * angularDamping;
+        other.angularVelocity += (otherOffsetX * impulseY - otherOffsetY * impulseX) / other.rotationInertia * angularDamping;
         
         // Push objects apart to prevent sticking
         const penetration = 0.1; // Small value to separate objects
